@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block content %}
+    <form id="add-researcher-form" action="{% url 'manage-researchers' %}" method="get">
+        <input type="number" name="campaign_id" value="{{ campaign.id }}" hidden>
+        <input type="text" name="action" value="add" hidden>
+        <label for="targetEmail">
+            Add new researcher. Email address =
+            <input type="email" name="targetEmail" required>
+        </label>
+        <input type="submit" value="ADD AS RESEARCHER">
+    </form>
+    &nbsp;
+    <table>
+        <tr>
+            <th class="name_column">Researcher's name</th>
+            <th class="email_column">Email</th>
+            <th class="action_column">Manage (action)</th>
+        </tr>
+        {% load humanize %}
+        {% for researcher in researchers %}
+            <tr>
+                <td class="name_column" title="{{ researcher.name }}">{{ researcher.name }}</td>
+                <td class="email_column" title="{{ researcher.email }}">{{ researcher.email }}</td>
+                <td class="action_column">
+                    <a class="action_button" href="{% url 'manage-researchers' %}?campaign_id={{ campaign.id }}&targetEmail={{ researcher.email }}&action=remove">
+                        <img title="Remove researcher from campaign" class="action_button_red" src="/static/remove.png" alt="remove">
+                    </a>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <style>
+        table {
+            color: #333;
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+        }
+
+        .name_column {
+            width: 40%;
+        }
+
+        .email_column {
+            width: 40%;
+        }
+
+        .action_column {
+            width: 20%;
+        }
+
+        td, th {
+            border: 1px solid transparent; /* No more visible border */
+            height: 30px;
+        {#transition: all 0.3s; /* Simple transition for hover effect */#}
+        }
+
+        th {
+            background: #4285F4; /* #F1F1F1; /* Darken header a bit */
+            color: white;
+            font-weight: bold;
+            padding: 10px 0;
+            font-size: large;
+        }
+
+        td {
+            background: white;
+            text-align: center;
+            cursor: pointer;
+            padding: 5px 0;
+        }
+
+        /* Cells in even rows (2,4,6...) are one color */
+        tr:nth-child(even) td {
+            background: white;
+        }
+
+        /* Cells in odd rows (1,3,5...) are another (excludes header cells)  */
+        tr:nth-child(odd) td {
+            background: #DFDFDF;
+        }
+
+        tr:not(:first-child):hover td {
+            background: #666;
+            color: white;
+        }
+
+        a.action_button {
+            text-decoration: none;
+        }
+
+        img.action_button_red {
+            background: orangered;
+            vertical-align: middle;
+            padding: 3px;
+            margin: 2px 0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: larger;
+            cursor: pointer;
+        {#transition: all 0.3s;#}
+        }
+
+        img.action_button_red:hover {
+            background: #4285F4;
+            color: black;
+        }
+    </style>
+{% endblock %}

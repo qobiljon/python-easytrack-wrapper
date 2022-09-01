@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% load humanize %}
+    <h3>For the campaign: "{{ campaign.name }}"</h3>
+    <table>
+        <tr>
+            <th class="icon_column">Icon</th>
+            <th class="name_column">Data source name</th>
+            <th class="config_column">Configurations</th>
+            <th class="amount_column">Number of<br>data samples</th>
+            <th class="sync_time_column">Latest sync time</th>
+            <th class="actions_column">Actions (on data)</th>
+        </tr>
+        {% load humanize %}
+        {% for data_source in data_sources %}
+            <tr data-source="{{ data_source.name }}" class="data_source">
+                <td class="icon_column"><img src="/static/{{ data_source.icon_name }}" alt="{{ data_source.name }}"></td>
+                <td class="name_column">{{ data_source.name }}</td>
+                <td class="config_column" title="{{ data_source.config_json }}">{{ data_source.config_json|truncatechars:30 }}</td>
+                <td class="amount_column" {% if data_source.amount_of_data == 0 %} style="color: red;" {% endif %}>{{ data_source.amount_of_data|intcomma }} samples</td>
+                <td class="sync_time_column">{{ data_source.last_sync_time }}</td>
+                <td class="actions_column">
+                    <a class="action_button" href="{% url 'view_data' %}?campaign_id={{ campaign.id }}&email={{ participant.email }}&data_source_id={{ data_source.id }}&from_timestamp=-1">
+                        <img title="View raw data" class="action_button_green" src="/static/view.png" alt="view">
+                    </a>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <style>
+        table {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            border-collapse: collapse;
+            border-spacing: 0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .icon_column {
+            width: 10%;
+        }
+        .name_column {
+            width: 20%;
+        }
+        .config_column {
+            width: 20%;
+        }
+        .amount_column {
+            width: 20%;
+        }
+        .sync_time_column {
+            width: 20%;
+        }
+        .actions_column {
+            width: 10%;
+        }
+
+        table tr:first-child {
+            background: #4285F4; /* #F1F1F1; /* Darken header a bit */
+            color: white;
+            font-weight: bold;
+            padding: 10px 0;
+            font-size: large;
+        }
+
+        table tr.data_source:nth-child(even) td {
+            background: white;
+        }
+
+        table tr.data_source:nth-child(odd) td {
+            background: #DFDFDF;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        img.action_button_green {
+            background: #2ecc71;
+            vertical-align: middle;
+            padding: 3px;
+            margin: 2px 0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: larger;
+            cursor: pointer;
+        {#transition: all 0.3s;#}
+        }
+
+        img.action_button_green:hover, img.action_button_red:hover {
+            background: #4285F4;
+            color: black;
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% if error %}
+        <h2 id="errorMessage">Failed to create the campaign, please try again!</h2>
+    {% endif %}
+
+    <form action="{% url 'campaign-editor' %}" method="post">
+        {% csrf_token %}
+        <input type="number" name="campaign_id" value="{% if edit_mode %}{{ campaign.id }}{% else %}-1{% endif %}" hidden>
+        <table id="inputTable">
+            <tr>
+                <td><label for="name">Name</label>
+                <td><input id="name" type="text" name="name" placeholder="e.g., My First Data Collection Campaign" required value="{% if edit_mode %}{{ campaign.name }}{% endif %}"></td>
+            </tr>
+            <tr>
+                <td><label for="notes">Notes on<br>the campaign</label>
+                <td><textarea name="notes" id="notes" cols="100" rows="10" placeholder="Notes on the campaign">{% if edit_mode %}{{ campaign.notes }}{% endif %}</textarea></td>
+            </tr>
+            <tr>
+                <td><label for="startTime">Start time</label>
+                <td><input name="startTime" id="startTime" type="datetime-local" required value="{% if edit_mode %}{{ campaign_start_time }}{% endif %}"/></td>
+            </tr>
+            <tr>
+                <td><label for="endTime">End time</label>
+                <td><input name="endTime" id="endTime" type="datetime-local" required value="{% if edit_mode %}{{ campaign_end_time }}{% endif %}"/></td>
+            </tr>
+            {% if not edit_mode %}
+                <tr>
+                    <td>
+                        <input id="showDataSourceTableCheckbox" type="checkbox" onclick="showDataSourceTableClicked();" checked>
+                        <label for="showDataSourceTableCheckbox">Data submitted by users<br>(i.e. not by researchers)</label>
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+
+        <a id="addRowButton" onclick="onInsertNewRowClick()">NEW DATA SOURCE</a>
+
+        <table id="dataSourceTable">
+            <tr>
+                <th>Selected</th>
+                <th>Icon</th>
+                <th>Data source name</th>
+            </tr>
+            {% if edit_mode %}
+                {# edit an existing campaign #}
+                {% for data_source in data_sources %}
+                    <tr data-source="{{ data_source.name }}" class="{% if data_source.selected %}selected_data_source{% else %}data_source{% endif %}">
+                        <td><input type="checkbox" name="{{ data_source.name }}" {% if data_source.selected %}checked{% endif %}></td>
+                        <td>
+                            <input type="text" name="icon_name_{{ data_source.name }}" value="{{ data_source.icon_name }}" hidden>
+                            <img src="/static/{{ data_source.icon_name }}" alt="">
+                        </td>
+                        <td>{{ data_source.name }}</td>
+                    </tr>
+                {% endfor %}
+            {% else %}
+                {# edit for a new campaign #}
+                {% for data_source in data_sources %}
+                    <tr data-source="{{ data_source.name }}" class="data_source">
+                        <td><input type="checkbox" name="{{ data_source.name }}"></td>
+                        <td>
+                            <input type="text" name="icon_name_{{ data_source.name }}" value="{{ data_source.icon_name }}" hidden>
+                            <img src="/static/{{ data_source.icon_name }}" alt="">
+                        </td>
+                        <td>{{ data_source.name }}</td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+        </table>
+
+        <div>
+            <a href="{% url 'campaigns-list' %}" id="cancel_campaign_creation_button">Cancel</a>
+            <input type="submit" value="{% if edit_mode %}Save changes{% else %}Create{% endif %}" id="create_campaign_button">
+        </div>
+    </form>
+
+    <script>
+        let dataSourceTable;
+        let counter = 0;
+        let removeInactiveUsersCheckbox;
+        let removeInactiveUsersNumberInput;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            dataSourceTable = document.getElementById("dataSourceTable");
+            removeInactiveUsersCheckbox = document.getElementById("removeInactiveUsersCheckbox");
+            removeInactiveUsersNumberInput = document.getElementById("removeInactiveUsersNumberInput");
+
+            const rows = document.querySelectorAll("tr[data-source]");
+            rows.forEach(row => {
+                row.style.cursor = "pointer";
+                let checkBox = row.firstElementChild.firstElementChild;
+                let input = row.lastElementChild.firstElementChild;
+                row.addEventListener("click", () => {
+                    checkBox.checked = !checkBox.checked;
+                    row.className = checkBox.checked ? "selected_data_source" : "data_source";
+                    if (checkBox.checked) {
+                        input.removeAttribute("disabled");
+                        input.setAttribute("required", "");
+                        input.focus();
+                        input.select();
+                    } else {
+                        input.setAttribute("disabled", "");
+                        input.removeAttribute("required");
+                    }
+                });
+            });
+        });
+
+        function removeInactiveUsersClicked() {
+            if (removeInactiveUsersCheckbox.checked) {
+                removeInactiveUsersNumberInput.min = "1";
+                removeInactiveUsersNumberInput.max = "100";
+                removeInactiveUsersNumberInput.value = {% if campaign.remove_inactive_users_timeout > 0 %}{{ campaign.remove_inactive_users_timeout }}{% else %}1{% endif %};
+                removeInactiveUsersNumberInput.style.display = "inline-block";
+            } else {
+                removeInactiveUsersNumberInput.min = "-1";
+                removeInactiveUsersNumberInput.max = "-1";
+                removeInactiveUsersNumberInput.value = "-1";
+                removeInactiveUsersNumberInput.style.display = "none";
+            }
+        }
+
+        function onInsertNewRowClick() {
+            let name = 'NEW_DATA_SOURCE_' + counter;
+
+            let row = dataSourceTable.insertRow(1);
+            row.style.cursor = "pointer";
+            row.className = "data_source";
+            row.setAttribute("new-data-source", "new-data-source");
+            let cell = row.insertCell();
+            cell.innerHTML = '<input type="checkbox" name="' + name + '">';
+            cell = row.insertCell();
+            cell.innerHTML = '<input type="text" value="miscellaneous-data-sources.png" name="icon_name_' + name + '" hidden><img src="http://{{ request.get_host }}/static/new.png" alt="">';
+            cell = row.insertCell();
+            cell.innerHTML = '<input type="text" value="' + name + '" name="' + name + '" class="jsonField" disabled>';
+
+            const rows = document.querySelectorAll("tr[new-data-source]");
+            rows.forEach(row => {
+                row.removeAttribute("new-data-source");
+                let checkBox = row.childNodes[0].firstElementChild;
+                let iconInput = row.childNodes[1].firstElementChild;
+                let nameInput = row.childNodes[2].firstElementChild;
+
+                if (!nameInput.hasAttribute("listenerIsSet")) {
+                    checkBox.setAttribute("defaultName", checkBox.getAttribute("name"));
+                    nameInput.addEventListener('input', function (evt) {
+                        if (nameInput.value.length === 0) {
+                            nameInput.value = checkBox.getAttribute("defaultName");
+                            checkBox.name = checkBox.getAttribute("defaultName");
+                            iconInput.name = "icon_name_" + checkBox.getAttribute("defaultName");
+                        }
+                        checkBox.name = "data_source_name_" + nameInput.value;
+                        iconInput.name = "icon_name_" + nameInput.value;
+                    });
+                    nameInput.setAttribute("listenerIsSet", 'true');
+                }
+
+                row.addEventListener("click", () => {
+                    checkBox.checked = !checkBox.checked;
+                    row.className = checkBox.checked ? "selected_data_source" : "data_source";
+                    if (checkBox.checked) {
+                        nameInput.removeAttribute("disabled");
+                        nameInput.setAttribute("required", "");
+
+                        nameInput.focus();
+                        nameInput.select();
+                    } else {
+                        nameInput.setAttribute("disabled", "");
+                        nameInput.removeAttribute("required");
+                    }
+                });
+            });
+
+            row = function (ev) {
+                let row = document.getElementById(ev.id);
+                let checkBox = row.childNodes[0].firstElementChild;
+                let nameInput = row.childNodes[2].firstElementChild;
+
+                checkBox.checked = !checkBox.checked;
+                row.className = checkBox.checked ? "selected_data_source" : "data_source";
+                if (checkBox.checked) {
+                    nameInput.removeAttribute("disabled");
+                    nameInput.setAttribute("required", "");
+
+                    nameInput.focus();
+                    nameInput.select();
+                } else {
+                    nameInput.setAttribute("disabled", "");
+                    nameInput.removeAttribute("required");
+                }
+            };
+            counter++;
+        }
+
+        function showDataSourceTableClicked() {
+            if ($('#showDataSourceTableCheckbox').is(':checked')) {
+                $('#addRowButton').show()
+                $('#dataSourceTable').show()
+            } else {
+                $('#addRowButton').hide()
+                $('#dataSourceTable').hide()
+            }
+        }
+    </script>
+
+    <style>
+        #errorMessage {
+            color: orangered;
+        }
+
+        table {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            border-collapse: collapse;
+            border-spacing: 0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #notes {
+            min-width: 60%;
+            max-width: 90%;
+            max-height: 60%;
+        }
+
+        #inputTable tr td input {
+            background: white;
+            border: #ccc 1px solid;
+            border-bottom: #ccc 2px solid;
+            padding: 8px;
+            color: black;
+            font-size: 1em;
+            width: 90%;
+        }
+
+        /* Cells in even rows (2,4,6...) are one color */
+        #dataSourceTable tr:first-child {
+            background: #4285F4; /* #F1F1F1; /* Darken header a bit */
+            color: white;
+            font-weight: bold;
+            padding: 10px 0;
+            font-size: large;
+        }
+
+        #dataSourceTable tr.data_source:nth-child(even) td {
+            background: white;
+        }
+
+        #dataSourceTable tr.data_source:nth-child(even) td {
+            background: white;
+        }
+
+        /* Cells in odd rows (1,3,5...) are another (excludes header cells)  */
+        #dataSourceTable tr.data_source:nth-child(odd) td {
+            background: #DFDFDF;
+        }
+
+        #dataSourceTable tr.data_source:not(:first-child):hover td {
+            background: #666;
+            color: white;
+        }
+
+        #dataSourceTable tr.selected_data_source td {
+            background: lightgreen;
+        }
+
+        #create_campaign_button {
+            background: #2ecc71;
+            padding: 20px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            float: right;
+            font-size: larger;
+            cursor: pointer;
+        {#transition: all 0.3s;#} text-decoration: none;
+        }
+
+        #create_campaign_button:hover {
+            background: #666;
+            color: #FFF;
+        }
+
+        #cancel_campaign_creation_button {
+            background: orangered;
+            padding: 20px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            float: left;
+            font-size: larger;
+            cursor: pointer;
+        {#transition: all 0.3s;#} text-decoration: none;
+        }
+
+        #cancel_campaign_creation_button:hover {
+            background: #666;
+            color: #FFF;
+        }
+
+        {#JSON fields#}
+        input.jsonField[type=text] {
+            text-align: center;
+        }
+
+        #addRowButton {
+            width: 50%;
+            background: #4285F4;
+            margin: 10px 0;
+            padding: 10px;
+            float: right;
+            color: white;
+            border: none;
+            text-align: center;
+            border-radius: 5px;
+            font-size: larger;
+            cursor: pointer;
+            text-decoration: none;
+        {#transition: all 0.3s;#}
+        }
+
+        #addRowButton:hover {
+            background: darkblue;
+        }
+    </style>
+{% endblock %}

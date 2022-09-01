@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+    <form id="monitor-form" action="{% url 'easytrack-monitor' %}" method="get">
+        <input type="number" name="campaign_id" value="{{ campaign.id }}" hidden>
+        <label for="participant_id">
+            Participant =
+            <select name="participant_id" form="monitor-form">
+                <option value="all" {% if plot_participant.id == 'all' %}selected{% endif %}>All campaign participants combined</option>
+                {% for participant in participants %}
+                    <option value="{{ participant.id }}" {% if plot_participant.id == participant.id %}selected{% endif %}>ID={{ participant.id }}. {{ participant.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        &nbsp;
+        <label for="data_source_name">
+            Data source =
+            <select name="data_source_name" form="monitor-form">
+                <option value="all" {% if plot_data_source.name == 'all' %}selected{% endif %}>All campaign data sources combined</option>
+                {% for data_source in all_data_sources %}
+                    <option value="{{ data_source.name }}" {% if plot_data_source.name == data_source.name %}selected{% endif %}>{{ data_source.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        &nbsp;
+        <label for="plot_date">
+            Date =
+            <input type="date" name="plot_date" value="{{ plot_date }}">
+        </label>
+        &nbsp;
+        <input type="submit" value="Plot">
+    </form>
+
+    <h3>DQ_completeness plot</h3>
+    {{ plot_data_source.plot|safe }}
+{% endblock %}

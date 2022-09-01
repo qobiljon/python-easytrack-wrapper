@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block content %}
+    <form action="{% url 'announce' %}" method="post">
+        {% csrf_token %}
+        <input type="number" name="campaign_id" hidden value="{{ campaign.id }}">
+        <table id="inputTable">
+            <tr>
+                <td><label for="subject">Subject</label>
+                <td><input name="subject" id="subject" type="text" placeholder="e.g., Resolving network issues" required></td>
+            </tr>
+            <tr>
+                <td><label for="content">Notification content</label>
+                <td><textarea name="content" id="content" cols="100" rows="10" placeholder="Content of the notification / announcement to participants"></textarea></td>
+            </tr>
+        </table>
+        <div>
+            <a href="{% url 'campaigns-list' %}" id="cancel_announcement_creation_button">Cancel</a>
+            <input type="submit" value="Create notification (announcement)" id="create_announcement_button">
+        </div>
+    </form>
+
+    <style>
+        table {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            border-collapse: collapse;
+            border-spacing: 0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #content {
+            min-width: 60%;
+            max-width: 90%;
+            max-height: 60%;
+        }
+
+        #cancel_announcement_creation_button {
+            background: orangered;
+            padding: 20px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            float: left;
+            font-size: larger;
+            cursor: pointer;
+        {#transition: all 0.3s;#} text-decoration: none;
+        }
+
+        #inputTable tr td input {
+            background: white;
+            border: #ccc 1px solid;
+            border-bottom: #ccc 2px solid;
+            padding: 8px;
+            color: black;
+            font-size: 1em;
+            width: 90%;
+        }
+
+        #cancel_announcement_creation_button:hover {
+            background: #666;
+            color: #FFF;
+        }
+
+        #create_announcement_button {
+            background: #2ecc71;
+            padding: 20px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            float: right;
+            font-size: larger;
+            cursor: pointer;
+        {#transition: all 0.3s;#} text-decoration: none;
+        }
+
+        #create_announcement_button:hover {
+            background: #666;
+            color: #FFF;
+        }
+    </style>
+{% endblock %}
