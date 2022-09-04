@@ -3,12 +3,14 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 
 # app
-from . import models
-from . import wrappers
-from .utils import notnull
+from easytrack import wrappers, models
+from easytrack.utils import notnull
 
 
-def find_user(user_id: Optional[int], email: Optional[str]) -> Optional[models.User]:
+def find_user(
+	user_id: Optional[int],
+	email: Optional[str]
+) -> Optional[models.User]:
 	"""
 	Used for finding models.User object by either id or email.
 	:param user_id: id of user being queried
@@ -24,7 +26,10 @@ def find_user(user_id: Optional[int], email: Optional[str]) -> Optional[models.U
 		notnull(None)  # both user_id and email are None
 
 
-def is_participant(user: models.User, campaign: models.Campaign) -> bool:
+def is_participant(
+	user: models.User,
+	campaign: models.Campaign
+) -> bool:
 	"""
 	Checks whether a user is a campaign's participant or not
 	:param user: user being checked
@@ -32,10 +37,16 @@ def is_participant(user: models.User, campaign: models.Campaign) -> bool:
 	:return: true if user is campaign's participant, false if not
 	"""
 
-	return models.Participant.filter(campaign=notnull(campaign).id, user=notnull(user).id).exists()
+	return models.Participant.filter(
+		campaign=notnull(campaign),
+		user=notnull(user)
+	).exists()
 
 
-def is_supervisor(user: models.User, campaign: models.Campaign) -> bool:
+def is_supervisor(
+	user: models.User,
+	campaign: models.Campaign
+) -> bool:
 	"""
 	Checks whether a user is a campaign's supervisor or not
 	:param user: user being checked
@@ -43,10 +54,16 @@ def is_supervisor(user: models.User, campaign: models.Campaign) -> bool:
 	:return: true if user is campaign's supervisor, false if not
 	"""
 
-	return models.Supervisor.filter(campaign=campaign, user=user).exists()
+	return models.Supervisor.filter(
+		campaign=campaign,
+		user=user
+	).exists()
 
 
-def get_participant(user: models.User, campaign: models.Campaign) -> models.Participant:
+def get_participant(
+	user: models.User,
+	campaign: models.Campaign
+) -> models.Participant:
 	"""
 	Returns a participant object depending on the user and campaign provided
 	:param user: user key to search for a participant object
@@ -54,10 +71,16 @@ def get_participant(user: models.User, campaign: models.Campaign) -> models.Part
 	:return: participant object
 	"""
 
-	return models.Participant.get_or_none(campaign=notnull(campaign), user=notnull(user))
+	return models.Participant.get_or_none(
+		campaign=notnull(campaign),
+		user=notnull(user)
+	)
 
 
-def get_supervisor(user: models.User, campaign: models.Campaign) -> models.Supervisor:
+def get_supervisor(
+	user: models.User,
+	campaign: models.Campaign
+) -> models.Supervisor:
 	"""
 	Returns a supervisor object depending on the user and campaign provided
 	:param user: user key to search for a supervisor object
@@ -65,40 +88,57 @@ def get_supervisor(user: models.User, campaign: models.Campaign) -> models.Super
 	:return: supervisor object
 	"""
 
-	return models.Supervisor.get_or_none(campaign=notnull(campaign), user=notnull(user))
+	return models.Supervisor.get_or_none(
+		campaign=notnull(campaign),
+		user=notnull(user)
+	)
 
 
-def get_campaign_participants(campaign: models.Campaign) -> List[models.Participant]:
+def get_campaign_participants(
+	campaign: models.Campaign
+) -> List[models.Participant]:
 	"""
 	Returns list of participants of a campaign
 	:param campaign: campaign being queried
 	:return: list of campaign's participants
 	"""
 
-	return models.Participant.filter(campaign=notnull(campaign))
+	return models.Participant.filter(
+		campaign=notnull(campaign)
+	)
 
 
-def get_campaign_participants_count(campaign: models.Campaign) -> int:
+def get_campaign_participants_count(
+	campaign: models.Campaign
+) -> int:
 	"""
 	Returns count of participants of a campaign
 	:param campaign: campaign being queried
 	:return: number of campaign's participants
 	"""
 
-	return models.Participant.filter(campaign=notnull(campaign)).count()
+	return models.Participant.filter(
+		campaign=notnull(campaign)
+	).count()
 
 
-def get_campaign_supervisors(campaign: models.Campaign) -> List[models.Supervisor]:
+def get_campaign_supervisors(
+	campaign: models.Campaign
+) -> List[models.Supervisor]:
 	"""
 	Returns list of a campaign's supervisors
 	:param campaign: campaign being queried
 	:return: list of campaign's supervisors
 	"""
 
-	return models.Supervisor.filter(campaign=notnull(campaign))
+	return models.Supervisor.filter(
+		campaign=notnull(campaign)
+	)
 
 
-def get_campaign(campaign_id: int) -> Optional[models.Campaign]:
+def get_campaign(
+	campaign_id: int
+) -> Optional[models.Campaign]:
 	"""
 	Used for finding models.Campaign object by id.
 	:param campaign_id: id of campaign being queried
@@ -108,14 +148,21 @@ def get_campaign(campaign_id: int) -> Optional[models.Campaign]:
 	return models.Campaign.get_or_none(id=notnull(campaign_id))
 
 
-def get_supervisor_campaigns(user: models.User) -> List[models.Campaign]:
+def get_supervisor_campaigns(
+	user: models.User
+) -> List[models.Campaign]:
 	"""
 	Filter campaigns by supervisor (when researcher wants to see the list of their campaigns)
 	:param user: the supervisor
 	:return: list of supervisor's campaigns
 	"""
 
-	return list(map(lambda supervisor: supervisor.campaign, models.Supervisor.filter(user=notnull(user))))
+	return list(map(
+		lambda supervisor: supervisor.campaign,
+		models.Supervisor.filter(
+			user=notnull(user)
+		)
+	))
 
 
 def find_data_source(
@@ -146,17 +193,29 @@ def get_all_data_sources() -> List[models.DataSource]:
 	return models.DataSource.select()
 
 
-def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSource]:
+def get_campaign_data_sources(
+	campaign: models.Campaign
+) -> List[models.DataSource]:
 	"""
 	Returns list of a campaign's data sources
 	:param campaign: campaign being queried
 	:return: list of campaign's data sources
 	"""
 
-	return list(map(lambda campaign_data_source: campaign_data_source.data_source, models.CampaignDataSources.filter(campaign=notnull(campaign))))
+	return list(map(
+		lambda campaign_data_source: campaign_data_source.data_source,
+		models.CampaignDataSources.filter(
+			campaign=notnull(campaign)
+		)
+	))
 
 
-def get_next_k_data_records(participant: models.Participant, data_source: models.DataSource, from_ts: dt, k: int) -> List[wrappers.DataRecord]:
+def get_next_k_data_records(
+	participant: models.Participant,
+	data_source: models.DataSource,
+	from_ts: dt,
+	k: int
+) -> List[wrappers.DataRecord]:
 	"""
 	Retrieves next k data records from database
 	:param participant: participant that has refernece to user and campaign
@@ -166,10 +225,20 @@ def get_next_k_data_records(participant: models.Participant, data_source: models
 	:return: list of data records
 	"""
 
-	return wrappers.DataTable.select_next_k(participant=notnull(participant), data_source=notnull(data_source), from_ts=notnull(from_ts), limit=notnull(k))
+	return wrappers.DataTable.select_next_k(
+		participant=notnull(participant),
+		data_source=notnull(data_source),
+		from_ts=notnull(from_ts),
+		limit=notnull(k)
+	)
 
 
-def get_filtered_data_records(participant: models.Participant, data_source: models.DataSource, from_ts: dt = None, till_ts: dt = None) -> List[wrappers.DataRecord]:
+def get_filtered_data_records(
+	participant: models.Participant,
+	data_source: models.DataSource,
+	from_ts: dt = None,
+	till_ts: dt = None
+) -> List[wrappers.DataRecord]:
 	"""
 	Retrieves filtered data based on provided range (start and end timestamps)
 	:param participant: participant that has refernece to user and campaign
@@ -179,10 +248,17 @@ def get_filtered_data_records(participant: models.Participant, data_source: mode
 	:return: list of data records
 	"""
 
-	return wrappers.DataTable.select_range(participant=notnull(participant), data_source=notnull(data_source), from_ts=notnull(from_ts), till_ts=notnull(till_ts))
+	return wrappers.DataTable.select_range(
+		participant=notnull(participant),
+		data_source=notnull(data_source),
+		from_ts=notnull(from_ts),
+		till_ts=notnull(till_ts)
+	)
 
 
-def get_participants_latest_stats(participant: models.Participant) -> wrappers.ParticipantStats:
+def get_participants_latest_stats(
+	participant: models.Participant
+) -> wrappers.ParticipantStats:
 	"""
 	returns latest available statistics of a participant
 	:param participant: participant being queried
@@ -192,7 +268,12 @@ def get_participants_latest_stats(participant: models.Participant) -> wrappers.P
 	return wrappers.ParticipantStats(participant=notnull(participant))
 
 
-def get_filtered_amount_of_data(participant: models.Participant, data_source: models.DataSource, from_ts: dt, till_ts: dt) -> int:
+def get_filtered_amount_of_data(
+	participant: models.Participant,
+	data_source: models.DataSource,
+	from_ts: dt,
+	till_ts: dt
+) -> int:
 	"""
 	Computes and returns the amount of data during specified period
 	:param participant: participant being queried
@@ -202,30 +283,41 @@ def get_filtered_amount_of_data(participant: models.Participant, data_source: mo
 	:return: amount of samples in the range with specified filters
 	"""
 
-	current: models.HourlyStats = models.HourlyStats.get_or_none(participant=notnull(participant), data_source=notnull(data_source), ts=till_ts.replace(minute=0, second=0, microsecond=0) + td(hours=1))
+	current: models.HourlyStats = models.HourlyStats.get_or_none(
+		participant=notnull(participant),
+		data_source=notnull(data_source),
+		ts=till_ts.replace(minute=0, second=0, microsecond=0) + td(hours=1)
+	)
 	if not current:
 		current: models.HourlyStats = models.HourlyStats.filter(
 			participant=notnull(participant),
 			data_source=notnull(data_source),
-		).order_by(models.HourlyStats.ts.desc()).limit(1)
+		).order_by(
+			models.HourlyStats.ts.desc()
+		).limit(1)
 
 		if not current:
 			return 0
-
-	if data_source not in current:
-		return 0
-
-	back_then: models.HourlyStats = models.HourlyStats.filter(participant=notnull(participant), data_source=notnull(data_source), ts=from_ts.replace(minute=0, second=0, microsecond=0))
-	if not back_then or data_source not in back_then:
-		if data_source in current.amounts:
-			return current.amounts[data_source]
 		else:
-			return 0
+			current = list(current)[0]
 
-	return current.amounts[data_source] - back_then.amounts[data_source]
+	back_then: models.HourlyStats = models.HourlyStats.filter(
+		participant=notnull(participant),
+		data_source=notnull(data_source),
+		ts=from_ts.replace(minute=0, second=0, microsecond=0)
+	)
+	if not back_then:
+		return 0
+	else:
+		back_then = list(back_then)[0]
+
+	return current.amount - back_then.amount
 
 
-def is_campaign_data_source(campaign: models.Campaign, data_source: models.Campaign) -> None:
+def is_campaign_data_source(
+	campaign: models.Campaign,
+	data_source: models.Campaign
+) -> None:
 	"""
 	Checks if data source is being used by a campaign
 	:param campaign: the campaign being queried
@@ -233,4 +325,7 @@ def is_campaign_data_source(campaign: models.Campaign, data_source: models.Campa
 	:return: whether data source is used by campaign
 	"""
 
-	return models.CampaignDataSources.filter(campaign=campaign, data_source=data_source).exists()
+	return models.CampaignDataSources.filter(
+		campaign=campaign,
+		data_source=data_source
+	).exists()

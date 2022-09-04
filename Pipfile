@@ -8,6 +8,7 @@ psycopg2-binary = "*"
 peewee = "*"
 python-dateutil = "*"
 twine = "*"
+python-dotenv = "*"
 
 [dev-packages]
 yapf = "*"
