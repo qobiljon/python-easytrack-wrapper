@@ -8,8 +8,8 @@ from easytrack.utils import notnull
 
 
 def find_user(
-	user_id: Optional[int],
-	email: Optional[str]
+		user_id: Optional[int],
+		email: Optional[str]
 ) -> Optional[models.User]:
 	"""
 	Used for finding models.User object by either id or email.
@@ -27,8 +27,8 @@ def find_user(
 
 
 def is_participant(
-	user: models.User,
-	campaign: models.Campaign
+		user: models.User,
+		campaign: models.Campaign
 ) -> bool:
 	"""
 	Checks whether a user is a campaign's participant or not
@@ -44,8 +44,8 @@ def is_participant(
 
 
 def is_supervisor(
-	user: models.User,
-	campaign: models.Campaign
+		user: models.User,
+		campaign: models.Campaign
 ) -> bool:
 	"""
 	Checks whether a user is a campaign's supervisor or not
@@ -61,8 +61,8 @@ def is_supervisor(
 
 
 def get_participant(
-	user: models.User,
-	campaign: models.Campaign
+		user: models.User,
+		campaign: models.Campaign
 ) -> models.Participant:
 	"""
 	Returns a participant object depending on the user and campaign provided
@@ -78,8 +78,8 @@ def get_participant(
 
 
 def get_supervisor(
-	user: models.User,
-	campaign: models.Campaign
+		user: models.User,
+		campaign: models.Campaign
 ) -> models.Supervisor:
 	"""
 	Returns a supervisor object depending on the user and campaign provided
@@ -95,7 +95,7 @@ def get_supervisor(
 
 
 def get_campaign_participants(
-	campaign: models.Campaign
+		campaign: models.Campaign
 ) -> List[models.Participant]:
 	"""
 	Returns list of participants of a campaign
@@ -109,7 +109,7 @@ def get_campaign_participants(
 
 
 def get_campaign_participants_count(
-	campaign: models.Campaign
+		campaign: models.Campaign
 ) -> int:
 	"""
 	Returns count of participants of a campaign
@@ -123,7 +123,7 @@ def get_campaign_participants_count(
 
 
 def get_campaign_supervisors(
-	campaign: models.Campaign
+		campaign: models.Campaign
 ) -> List[models.Supervisor]:
 	"""
 	Returns list of a campaign's supervisors
@@ -137,7 +137,7 @@ def get_campaign_supervisors(
 
 
 def get_campaign(
-	campaign_id: int
+		campaign_id: int
 ) -> Optional[models.Campaign]:
 	"""
 	Used for finding models.Campaign object by id.
@@ -149,7 +149,7 @@ def get_campaign(
 
 
 def get_supervisor_campaigns(
-	user: models.User
+		user: models.User
 ) -> List[models.Campaign]:
 	"""
 	Filter campaigns by supervisor (when researcher wants to see the list of their campaigns)
@@ -166,8 +166,8 @@ def get_supervisor_campaigns(
 
 
 def find_data_source(
-	data_source_id: Optional[int],
-	name: Optional[str],
+		data_source_id: Optional[int],
+		name: Optional[str],
 ) -> Optional[models.DataSource]:
 	"""
 	Used for finding DataSource object by either id or name.
@@ -194,7 +194,7 @@ def get_all_data_sources() -> List[models.DataSource]:
 
 
 def get_campaign_data_sources(
-	campaign: models.Campaign
+		campaign: models.Campaign
 ) -> List[models.DataSource]:
 	"""
 	Returns list of a campaign's data sources
@@ -211,10 +211,10 @@ def get_campaign_data_sources(
 
 
 def get_next_k_data_records(
-	participant: models.Participant,
-	data_source: models.DataSource,
-	from_ts: dt,
-	k: int
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		k: int
 ) -> List[wrappers.DataRecord]:
 	"""
 	Retrieves next k data records from database
@@ -234,10 +234,10 @@ def get_next_k_data_records(
 
 
 def get_filtered_data_records(
-	participant: models.Participant,
-	data_source: models.DataSource,
-	from_ts: dt = None,
-	till_ts: dt = None
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt = None,
+		till_ts: dt = None
 ) -> List[wrappers.DataRecord]:
 	"""
 	Retrieves filtered data based on provided range (start and end timestamps)
@@ -257,7 +257,7 @@ def get_filtered_data_records(
 
 
 def get_participants_latest_stats(
-	participant: models.Participant
+		participant: models.Participant
 ) -> wrappers.ParticipantStats:
 	"""
 	returns latest available statistics of a participant
@@ -269,10 +269,10 @@ def get_participants_latest_stats(
 
 
 def get_filtered_amount_of_data(
-	participant: models.Participant,
-	data_source: models.DataSource,
-	from_ts: dt,
-	till_ts: dt
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		till_ts: dt
 ) -> int:
 	"""
 	Computes and returns the amount of data during specified period
@@ -286,7 +286,7 @@ def get_filtered_amount_of_data(
 	current: models.HourlyStats = models.HourlyStats.get_or_none(
 		participant=notnull(participant),
 		data_source=notnull(data_source),
-		ts=till_ts.replace(minute=0, second=0, microsecond=0) + td(hours=1)
+		ts=till_ts.replace(minute=0, second=0, microsecond=0)
 	)
 	if not current:
 		current: models.HourlyStats = models.HourlyStats.filter(
@@ -296,7 +296,7 @@ def get_filtered_amount_of_data(
 			models.HourlyStats.ts.desc()
 		).limit(1)
 
-		if not current:
+		if not current.exists():
 			return 0
 		else:
 			current = list(current)[0]
@@ -306,7 +306,7 @@ def get_filtered_amount_of_data(
 		data_source=notnull(data_source),
 		ts=from_ts.replace(minute=0, second=0, microsecond=0)
 	)
-	if not back_then:
+	if not back_then.exists():
 		return 0
 	else:
 		back_then = list(back_then)[0]
@@ -315,8 +315,8 @@ def get_filtered_amount_of_data(
 
 
 def is_campaign_data_source(
-	campaign: models.Campaign,
-	data_source: models.Campaign
+		campaign: models.Campaign,
+		data_source: models.Campaign
 ) -> None:
 	"""
 	Checks if data source is being used by a campaign
