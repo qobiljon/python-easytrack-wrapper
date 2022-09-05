@@ -2,14 +2,14 @@ from datetime import datetime as dt
 from typing import Dict, List, Optional
 
 # app
-from easytrack import selectors as slc, wrappers, models
-from easytrack.utils import notnull
+from . import selectors as slc, wrappers, models
+from .utils import notnull
 
 
 def create_user(
-	email: str,
-	name: str,
-	session_key: str
+		email: str,
+		name: str,
+		session_key: str
 ) -> models.User:
 	"""
 	Creates a user object in database and returns User object
@@ -27,8 +27,8 @@ def create_user(
 
 
 def set_user_session_key(
-	user: models.User,
-	new_session_key: str
+		user: models.User,
+		new_session_key: str
 ) -> None:
 	"""
 	Updates a user's session key (that is used for authentication)
@@ -42,8 +42,8 @@ def set_user_session_key(
 
 
 def add_participant_to_campaign(
-	add_user: models.User,
-	campaign: models.Campaign
+		add_user: models.User,
+		campaign: models.Campaign
 ) -> bool:
 	"""
 	Binds user with campaign, making a participant.
@@ -54,8 +54,8 @@ def add_participant_to_campaign(
 	"""
 
 	if slc.is_participant(
-		user=notnull(add_user),
-		campaign=notnull(campaign)
+			user=notnull(add_user),
+			campaign=notnull(campaign)
 	): return False
 
 	# 1. bind the user to campaign
@@ -68,13 +68,16 @@ def add_participant_to_campaign(
 	wrappers.DataTable.create(
 		participant=participant
 	)
+	wrappers.AggDataTable.create(
+		participant=participant
+	)
 
 	return True
 
 
 def add_supervisor_to_campaign(
-	new_user: models.User,
-	supervisor: models.Supervisor,
+		new_user: models.User,
+		supervisor: models.Supervisor,
 ) -> bool:
 	"""
 	Binds user with campaign, making a supervisor.
@@ -86,8 +89,8 @@ def add_supervisor_to_campaign(
 	campaign: models.Campaign = notnull(supervisor).campaign
 
 	if slc.is_supervisor(
-		user=notnull(new_user),
-		campaign=notnull(campaign)
+			user=notnull(new_user),
+			campaign=notnull(campaign)
 	): return False
 
 	models.Supervisor.create(
@@ -98,7 +101,7 @@ def add_supervisor_to_campaign(
 
 
 def remove_supervisor_from_campaign(
-	oldSupervisor: models.Supervisor
+		oldSupervisor: models.Supervisor
 ) -> None:
 	"""
 	Unbinds a (supervisor) user from campaign.
@@ -111,11 +114,11 @@ def remove_supervisor_from_campaign(
 
 
 def create_campaign(
-	owner: models.User,
-	name: str,
-	start_ts: dt,
-	end_ts: dt,
-	data_sources: List[models.DataSource]
+		owner: models.User,
+		name: str,
+		start_ts: dt,
+		end_ts: dt,
+		data_sources: List[models.DataSource]
 ) -> models.Campaign:
 	"""
 	Creates a campaign object in database and returns Campaign object
@@ -152,8 +155,8 @@ def create_campaign(
 
 
 def add_campaign_data_source(
-	campaign: models.Campaign,
-	data_source: models.Campaign
+		campaign: models.Campaign,
+		data_source: models.Campaign
 ) -> None:
 	"""
 	Adds the data source to campaign
@@ -163,8 +166,8 @@ def add_campaign_data_source(
 	"""
 
 	if slc.is_campaign_data_source(
-		campaign=campaign,
-		data_source=data_source
+			campaign=campaign,
+			data_source=data_source
 	): return
 
 	models.CampaignDataSources.create(
@@ -174,8 +177,8 @@ def add_campaign_data_source(
 
 
 def remove_campaign_data_source(
-	campaign: models.Campaign,
-	data_source: models.Campaign
+		campaign: models.Campaign,
+		data_source: models.Campaign
 ) -> None:
 	"""
 	Removes the data source from campaign
@@ -185,22 +188,22 @@ def remove_campaign_data_source(
 	"""
 
 	if not slc.is_campaign_data_source(
-		campaign=campaign,
-		data_source=data_source
+			campaign=campaign,
+			data_source=data_source
 	): return
 
 	for campaign_data_source in models.CampaignDataSources.filter(
-		campaign=campaign,
-		data_source=data_source
+			campaign=campaign,
+			data_source=data_source
 	): campaign_data_source.delete_instance()
 
 
 def update_campaign(
-	supervisor: models.Supervisor,
-	name: str,
-	start_ts: dt,
-	end_ts: dt,
-	data_sources: List[models.DataSource]
+		supervisor: models.Supervisor,
+		name: str,
+		start_ts: dt,
+		end_ts: dt,
+		data_sources: List[models.DataSource]
 ) -> None:
 	"""
 	Update parameters of a campaign object in the database.
@@ -235,7 +238,7 @@ def update_campaign(
 
 
 def delete_campaign(
-	supervisor: models.Supervisor
+		supervisor: models.Supervisor
 ) -> None:
 	"""
 	Delete a campaign - must only be called if campaign's owner makes the call.
@@ -248,8 +251,8 @@ def delete_campaign(
 
 
 def create_data_source(
-	name: str,
-	icon_name: str
+		name: str,
+		icon_name: str
 ) -> models.DataSource:
 	"""
 	Creates a data source (if not exists)
@@ -270,10 +273,10 @@ def create_data_source(
 
 
 def create_data_record(
-	participant: models.Participant,
-	data_source: models.DataSource,
-	ts: dt,
-	val: Dict
+		participant: models.Participant,
+		data_source: models.DataSource,
+		ts: dt,
+		val: Dict
 ) -> None:
 	"""
 	Creates a data record in raw data table (e.g. sensor reading)
@@ -293,10 +296,10 @@ def create_data_record(
 
 
 def create_data_records(
-	participant: models.Participant,
-	data_source_ids: List[int],
-	tss: List[dt],
-	vals: List[Dict]
+		participant: models.Participant,
+		data_source_ids: List[int],
+		tss: List[dt],
+		vals: List[Dict]
 ) -> None:
 	"""
 	Creates a data record in raw data table (e.g. sensor reading)
@@ -322,8 +325,8 @@ def create_data_records(
 
 
 def dump_data(
-	participant: models.Participant,
-	data_source: Optional[models.DataSource]
+		participant: models.Participant,
+		data_source: Optional[models.DataSource]
 ) -> str:
 	"""
 	Dumps content of a particular DataTable into a downloadable file

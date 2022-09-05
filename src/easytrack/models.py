@@ -10,7 +10,7 @@ import psycopg2 as pg2
 import psycopg2.extras as pg2_extras
 
 # app
-from src.easytrack.utils import notnull
+from .utils import notnull
 import dotenv
 
 dotenv.load_dotenv()

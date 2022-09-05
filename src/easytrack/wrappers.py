@@ -1,26 +1,26 @@
-from datetime import datetime as dt
-from datetime import timedelta as td
 from typing import Dict, List, Optional, OrderedDict
-import collections
+from datetime import timedelta as td
+from datetime import datetime as dt
 from os import getenv
+import collections
 import pytz
 
 # libs
-import psycopg2 as pg2
-import psycopg2.extras as pg2_extras
 from psycopg2.extras import _connection as PostgresConnection  # noqa
+import psycopg2.extras as pg2_extras
+import psycopg2 as pg2
 
 # app
-from easytrack import models
-from easytrack.utils import notnull, get_temp_filepath, strip_tz
+from . import models
+from .utils import notnull, get_temp_filepath, strip_tz
 
 
 class DataRecord:
 	def __init__(
-		self,
-		data_source: models.DataSource,
-		ts: dt,
-		val: Dict
+			self,
+			data_source: models.DataSource,
+			ts: dt,
+			val: Dict
 	):
 		self.data_source: models.DataSource = notnull(data_source)
 		self.ts: dt = notnull(strip_tz(ts))
@@ -28,13 +28,13 @@ class DataRecord:
 
 
 class DataTable:
-	con: Optional[PostgresConnection] = None
+	__con: Optional[PostgresConnection] = None
 
 	@staticmethod
 	def __connect():
-		if DataTable.con: return
+		if DataTable.__con: return
 
-		DataTable.con = pg2.connect(
+		DataTable.__con = pg2.connect(
 			host=notnull(getenv(key='POSTGRES_HOST')),
 			port=notnull(getenv(key='POSTGRES_PORT')),
 			dbname=notnull(getenv(key='POSTGRES_DBNAME')),
@@ -45,7 +45,7 @@ class DataTable:
 
 	@staticmethod
 	def __get_name(
-		participant: models.Participant
+			participant: models.Participant
 	) -> str:
 		"""
 		Returns a table name for particular campaign participant
@@ -60,7 +60,7 @@ class DataTable:
 
 	@staticmethod
 	def create(
-		participant: models.Participant
+			participant: models.Participant
 	) -> None:
 		"""
 		Creates a table for a participant to store their data
@@ -71,19 +71,22 @@ class DataTable:
 		table_name = DataTable.__get_name(participant=participant)
 
 		DataTable.__connect()
-		cur = DataTable.con.cursor()
+		cur = DataTable.__con.cursor()
 		cur.execute('create schema if not exists data')
+
+		# data table
 		cur.execute(f'create table if not exists data.{table_name}(data_source_id int references core.data_source (id), ts timestamp, val jsonb)')  # noqa
 		cur.execute(f'create index if not exists idx_{table_name}_ts on data.{table_name} (ts)')  # noqa
+
 		cur.close()
-		DataTable.con.commit()
+		DataTable.__con.commit()
 
 	@staticmethod
 	def insert(
-		participant: models.Participant,
-		data_source: models.DataSource,
-		ts: dt,
-		val: Dict
+			participant: models.Participant,
+			data_source: models.DataSource,
+			ts: dt,
+			val: Dict
 	) -> None:
 		"""
 		Creates a data record in raw data table (e.g. sensor reading)
@@ -97,21 +100,21 @@ class DataTable:
 		table_name = DataTable.__get_name(participant=participant)
 
 		DataTable.__connect()
-		cur = DataTable.con.cursor()
+		cur = DataTable.__con.cursor()
 		cur.execute(f'insert into data.{table_name}(data_source_id, ts, val) values (%s,%s,%s)', (  # noqa
 			data_source,
 			strip_tz(ts),
 			pg2_extras.Json(val)
 		))
 		cur.close()
-		DataTable.con.commit()
+		DataTable.__con.commit()
 
 	@staticmethod
 	def select_next_k(
-		participant: models.Participant,
-		data_source: models.DataSource,
-		from_ts: dt,
-		limit: int
+			participant: models.Participant,
+			data_source: models.DataSource,
+			from_ts: dt,
+			limit: int
 	) -> List[DataRecord]:
 		"""
 		Retrieves next k data records from database
@@ -125,7 +128,7 @@ class DataTable:
 		table_name = DataTable.__get_name(participant=participant)
 
 		DataTable.__connect()
-		cur: pg2_extras.DictCursor = DataTable.con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur: pg2_extras.DictCursor = DataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
 		cur.execute(f'select data_source_id, ts, val from data.{table_name} where data_source_id = %s and ts >= %s limit %s', (  # noqa
 			data_source.id,
 			strip_tz(from_ts),
@@ -142,11 +145,11 @@ class DataTable:
 
 	@staticmethod
 	def select_range(
-		participant: models.Participant,
-		data_source: models.DataSource,
-		from_ts: dt,
-		till_ts: dt
-	) -> List[DataRecord]:
+			participant: models.Participant,
+			data_source: models.DataSource,
+			from_ts: dt,
+			till_ts: dt
+	) -> List[pg2_extras.DictRow]:
 		"""
 		Retrieves filtered data based on provided range (start and end timestamps)
 		:param participant: participant that has refernece to user and campaign
@@ -159,7 +162,13 @@ class DataTable:
 		table_name = DataTable.__get_name(participant=participant)
 
 		DataTable.__connect()
-		cur: pg2_extras.DictCursor = DataTable.con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur: pg2_extras.DictCursor = DataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
+		s = cur.mogrify(f'select data_source_id, ts, val from data.{table_name} where data_source_id = %s and ts >= %s and ts < %s', (  # noqa
+			data_source.id,
+			strip_tz(from_ts),
+			strip_tz(till_ts)
+		))
+
 		cur.execute(f'select data_source_id, ts, val from data.{table_name} where data_source_id = %s and ts >= %s and ts < %s', (  # noqa
 			data_source.id,
 			strip_tz(from_ts),
@@ -167,19 +176,14 @@ class DataTable:
 		))
 		rows = cur.fetchall()
 		cur.close()
-
-		return list(map(lambda row: DataRecord(
-			data_source=models.DataSource.get_by_id(pk=row.data_source_id),
-			ts=row.ts,
-			val=row.val
-		), rows))
+		return rows
 
 	@staticmethod
 	def select_count(
-		participant: models.Participant,
-		data_source: models.DataSource,
-		from_ts: dt,
-		till_ts: dt
+			participant: models.Participant,
+			data_source: models.DataSource,
+			from_ts: dt,
+			till_ts: dt
 	) -> int:
 		"""
 		Retrieves amount of filtered data based on provided range (start and end timestamps)
@@ -193,7 +197,7 @@ class DataTable:
 		table_name = DataTable.__get_name(participant=participant)
 
 		DataTable.__connect()
-		cur: pg2_extras.DictCursor = DataTable.con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur: pg2_extras.DictCursor = DataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
 
 		cur.execute(f'select count(*) from data.{table_name} where data_source_id = %s and ts >= %s and ts < %s', (  # noqa
 			data_source.id,
@@ -207,8 +211,8 @@ class DataTable:
 
 	@staticmethod
 	def select_first_ts(
-		participant: models.Participant,
-		data_source: models.DataSource
+			participant: models.Participant,
+			data_source: models.DataSource
 	) -> Optional[dt]:
 		"""
 		Retrieves the first row's timestamp
@@ -220,7 +224,7 @@ class DataTable:
 		table_name = DataTable.__get_name(participant=participant)
 
 		DataTable.__connect()
-		cur: pg2_extras.DictCursor = DataTable.con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur: pg2_extras.DictCursor = DataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
 		cur.execute(f'select ts from data.{table_name} where data_source_id = %s order by ts asc limit 1', (  # noqa
 			data_source.id,
 		))
@@ -231,8 +235,8 @@ class DataTable:
 
 	@staticmethod
 	def dump_to_file(
-		participant: models.Participant,
-		data_source: Optional[models.DataSource]
+			participant: models.Participant,
+			data_source: Optional[models.DataSource]
 	) -> str:
 		"""
 		Dumps content of a particular DataTable into a downloadable file
@@ -245,7 +249,7 @@ class DataTable:
 		res_filepath = get_temp_filepath(filename=f'{table_name}.csv')
 
 		DataTable.__connect()
-		cur: pg2_extras.DictCursor = DataTable.con.cursor()
+		cur: pg2_extras.DictCursor = DataTable.__con.cursor()
 		if data_source is None:
 			with open(file=res_filepath, mode='w') as file:
 				cur.copy_to(
@@ -264,12 +268,188 @@ class DataTable:
 		return res_filepath
 
 
+class AggDataTable:
+	__con: Optional[PostgresConnection] = None
+
+	@staticmethod
+	def __connect():
+		if AggDataTable.__con: return
+
+		AggDataTable.__con = pg2.connect(
+			host=notnull(getenv(key='POSTGRES_HOST')),
+			port=notnull(getenv(key='POSTGRES_PORT')),
+			dbname=notnull(getenv(key='POSTGRES_DBNAME')),
+			user=notnull(getenv(key='POSTGRES_USER')),
+			password=notnull(getenv(key='POSTGRES_PASSWORD')),
+			options="-c search_path=data"
+		)
+
+	@staticmethod
+	def __get_name(
+			participant: models.Participant
+	) -> str:
+		"""
+		Returns a table name for particular campaign participant
+		:param participant: the participant that includes campaign and user id information
+		:return: name of the corresponding data table
+		"""
+
+		return '_'.join([
+			f'campaign{participant.campaign.id}',
+			f'user{participant.id}'
+		]) + '_agg'
+
+	@staticmethod
+	def create(
+			participant: models.Participant
+	) -> None:
+		"""
+		Creates a table for a participant to store their data
+		:param participant: user participating in a campaign
+		:return:
+		"""
+
+		table_name = AggDataTable.__get_name(participant=participant)
+
+		AggDataTable.__connect()
+		cur = AggDataTable.__con.cursor()
+		cur.execute('create schema if not exists data')
+
+		# three hour aggregates
+		cur.execute(f'create table if not exists data.{table_name}_agg(data_source_id int references core.data_source (id), ts timestamp, val jsonb)')  # noqa
+		cur.execute(f'create index if not exists idx_{table_name}_agg_ts on data.{table_name}_agg (ts)')  # noqa
+
+		cur.close()
+		AggDataTable.__con.commit()
+
+	@staticmethod
+	def insert(
+			participant: models.Participant,
+			data_source: models.DataSource,
+			ts: dt,
+			val: Dict
+	) -> None:
+		"""
+		Creates a data record in raw data table (e.g. sensor reading)
+		:param participant: participant of a campaign
+		:param data_source: data source of the data record
+		:param ts: timestamp
+		:param val: value
+		:return: None
+		"""
+
+		table_name = AggDataTable.__get_name(participant=participant)
+
+		AggDataTable.__connect()
+		cur = AggDataTable.__con.cursor()
+
+		cur.execute(f'insert into data.{table_name}(data_source_id, ts, val) values (%s,%s,%s)', (  # noqa
+			data_source.id,
+			strip_tz(ts),
+			pg2_extras.Json(val)
+		))
+		cur.close()
+		AggDataTable.__con.commit()
+
+	@staticmethod
+	def select_next_k(
+			participant: models.Participant,
+			data_source: models.DataSource,
+			from_ts: dt,
+			limit: int
+	) -> List[DataRecord]:
+		"""
+		Retrieves next k data records from database
+		:param participant: participant that has refernece to user and campaign
+		:param data_source: type of data to retrieve
+		:param from_ts: starting timestamp
+		:param limit: max amount of records to query
+		:return: list of data records
+		"""
+
+		table_name = AggDataTable.__get_name(participant=participant)
+
+		AggDataTable.__connect()
+		cur: pg2_extras.DictCursor = AggDataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur.execute(f'select data_source_id, ts, val from data.{table_name} where data_source_id = %s and ts >= %s limit %s', (  # noqa
+			data_source.id,
+			strip_tz(from_ts),
+			limit
+		))
+		rows = cur.fetchall()
+		cur.close()
+
+		return list(map(lambda row: DataRecord(
+			data_source=models.DataSource.get_by_id(pk=row['data_source_id']),
+			ts=row['ts'],
+			val=row['val']
+		), rows))
+
+	@staticmethod
+	def select_range(
+			participant: models.Participant,
+			data_source: models.DataSource,
+			from_ts: dt,
+			till_ts: dt
+	) -> List[DataRecord]:
+		"""
+		Retrieves filtered data based on provided range (start and end timestamps)
+		:param participant: participant that has refernece to user and campaign
+		:param data_source: type of data to retrieve
+		:param from_ts: starting timestamp
+		:param till_ts: ending timestamp
+		:return: list of data records
+		"""
+
+		table_name = AggDataTable.__get_name(participant=participant)
+
+		AggDataTable.__connect()
+		cur: pg2_extras.DictCursor = AggDataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur.execute(f'select data_source_id, ts, val from data.{table_name} where data_source_id = %s and ts >= %s and ts < %s', (  # noqa
+			data_source.id,
+			strip_tz(from_ts),
+			strip_tz(till_ts)
+		))
+		rows = cur.fetchall()
+		cur.close()
+
+		return list(map(lambda row: DataRecord(
+			data_source=models.DataSource.get_by_id(pk=row.data_source_id),
+			ts=row.ts,
+			val=row.val
+		), rows))
+
+	@staticmethod
+	def select_last_ts(
+			participant: models.Participant,
+			data_source: models.DataSource
+	) -> Optional[dt]:
+		"""
+		Retrieves the first row's timestamp
+		:param participant: participant that has refernece to user and campaign
+		:param data_source: type of data to retrieve
+		:return: first timestamp in the table
+		"""
+
+		table_name = AggDataTable.__get_name(participant=participant)
+
+		AggDataTable.__connect()
+		cur: pg2_extras.DictCursor = AggDataTable.__con.cursor(cursor_factory=pg2_extras.DictCursor)
+		cur.execute(f'select ts from data.{table_name} where data_source_id = %s order by ts desc limit 1', (  # noqa
+			data_source.id,
+		))
+		res = list(cur.fetchall())
+		cur.close()
+
+		return res[0][0] if res else None
+
+
 class DataSourceStats:
 	def __init__(
-		self,
-		data_source: models.DataSource,
-		amount_of_samples: Optional[int] = 0,
-		last_sync_time: Optional[dt] = dt.fromtimestamp(0)
+			self,
+			data_source: models.DataSource,
+			amount_of_samples: Optional[int] = 0,
+			last_sync_time: Optional[dt] = dt.fromtimestamp(0)
 	):
 		self.data_source: models.DataSource = notnull(data_source)
 		self.amount_of_samples: int = notnull(amount_of_samples)
