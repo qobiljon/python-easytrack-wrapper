@@ -131,7 +131,6 @@ conn = pg2.connect(
 cur: pg2_extras.DictCursor = conn.cursor(cursor_factory=pg2_extras.DictCursor)
 cur.execute('create schema if not exists core')
 cur.execute('create schema if not exists data')
-cur.execute('create schema if not exists geoplan')
 conn.commit()
 conn.close()
 # connect and prepare tables
