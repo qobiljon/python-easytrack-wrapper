@@ -316,8 +316,8 @@ class AggDataTable:
 		cur.execute('create schema if not exists data')
 
 		# three hour aggregates
-		cur.execute(f'create table if not exists data.{table_name}_agg(data_source_id int references core.data_source (id), ts timestamp, val jsonb)')  # noqa
-		cur.execute(f'create index if not exists idx_{table_name}_agg_ts on data.{table_name}_agg (ts)')  # noqa
+		cur.execute(f'create table if not exists data.{table_name}(data_source_id int references core.data_source (id), ts timestamp, val jsonb)')  # noqa
+		cur.execute(f'create index if not exists idx_{table_name}_ts on data.{table_name} (ts)')  # noqa
 
 		cur.close()
 		AggDataTable.__con.commit()
