@@ -1,9 +1,8 @@
 from typing import List, Optional
 from datetime import datetime as dt
-from datetime import timedelta as td
 
 # app
-from easytrack import wrappers, models
+from easytrack import models
 from easytrack.utils import notnull
 
 
@@ -210,64 +209,6 @@ def get_campaign_data_sources(
 	))
 
 
-def get_next_k_data_records(
-		participant: models.Participant,
-		data_source: models.DataSource,
-		from_ts: dt,
-		k: int
-) -> List[wrappers.DataRecord]:
-	"""
-	Retrieves next k data records from database
-	:param participant: participant that has refernece to user and campaign
-	:param data_source: type of data to retrieve
-	:param from_ts: starting timestamp
-	:param k: max amount of records to query
-	:return: list of data records
-	"""
-
-	return wrappers.DataTable.select_next_k(
-		participant=notnull(participant),
-		data_source=notnull(data_source),
-		from_ts=notnull(from_ts),
-		limit=notnull(k)
-	)
-
-
-def get_filtered_data_records(
-		participant: models.Participant,
-		data_source: models.DataSource,
-		from_ts: dt = None,
-		till_ts: dt = None
-) -> List[wrappers.DataRecord]:
-	"""
-	Retrieves filtered data based on provided range (start and end timestamps)
-	:param participant: participant that has refernece to user and campaign
-	:param data_source: type of data to retrieve
-	:param from_ts: starting timestamp
-	:param till_ts: ending timestamp
-	:return: list of data records
-	"""
-
-	return wrappers.DataTable.select_range(
-		participant=notnull(participant),
-		data_source=notnull(data_source),
-		from_ts=notnull(from_ts),
-		till_ts=notnull(till_ts)
-	)
-
-
-def get_participants_latest_stats(
-		participant: models.Participant
-) -> wrappers.ParticipantStats:
-	"""
-	returns latest available statistics of a participant
-	:param participant: participant being queried
-	:return: latest stats
-	"""
-
-	return wrappers.ParticipantStats(participant=notnull(participant))
-
-
 def get_filtered_amount_of_data(
 		participant: models.Participant,
 		data_source: models.DataSource,
@@ -316,7 +257,7 @@ def get_filtered_amount_of_data(
 
 def is_campaign_data_source(
 		campaign: models.Campaign,
-		data_source: models.Campaign
+		data_source: models.DataSource
 ) -> None:
 	"""
 	Checks if data source is being used by a campaign

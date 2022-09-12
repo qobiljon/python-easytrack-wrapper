@@ -156,7 +156,7 @@ def create_campaign(
 
 def add_campaign_data_source(
 		campaign: models.Campaign,
-		data_source: models.Campaign
+		data_source: models.DataSource
 ) -> None:
 	"""
 	Adds the data source to campaign
@@ -178,7 +178,7 @@ def add_campaign_data_source(
 
 def remove_campaign_data_source(
 		campaign: models.Campaign,
-		data_source: models.Campaign
+		data_source: models.DataSource
 ) -> None:
 	"""
 	Removes the data source from campaign
@@ -252,12 +252,14 @@ def delete_campaign(
 
 def create_data_source(
 		name: str,
-		icon_name: str
+		icon_name: str,
+		is_categorical: bool
 ) -> models.DataSource:
 	"""
 	Creates a data source (if not exists)
 	:param name: name of the data source
 	:param icon_name: icon of the data source
+	:param is_categorical: categorical or quantitative variable
 	:return: newly created data source (or the one with matching name)
 	"""
 
@@ -268,7 +270,8 @@ def create_data_source(
 
 	return models.DataSource.create(
 		name=name,
-		icon_name=notnull(icon_name)
+		icon_name=notnull(icon_name),
+		is_categorical=notnull(is_categorical)
 	)
 
 

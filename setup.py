@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
 	name='python-easytrack',
-	version='1.0.11',
+	version='1.0.12',
 	license='MIT',
 	author="Kobiljon Toshnazarov",
 	author_email='kobiljon.toshnazarov@gmail.com',
@@ -10,5 +10,11 @@ setup(
 	package_dir={'': 'src'},
 	url='https://github.com/easy-track/easytrack',
 	keywords='easytrack boilerplate',
-	install_requires=['psycopg2-binary', 'peewee', 'python-dateutil'],
+	install_requires=[
+		'psycopg2-binary',
+		'peewee',
+		'python-dateutil',
+		'python-dotenv',
+		'pytz'
+	],
 )

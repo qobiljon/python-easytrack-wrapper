@@ -3,9 +3,8 @@ from datetime import timedelta as td
 from os import getenv
 
 # libs
-from peewee import AutoField, TextField, ForeignKeyField, TimestampField
+from peewee import AutoField, TextField, ForeignKeyField, TimestampField, IntegerField, BooleanField
 from peewee import Model, PostgresqlDatabase
-from playhouse.postgres_ext import IntegerField
 import psycopg2 as pg2
 import psycopg2.extras as pg2_extras
 
@@ -54,6 +53,7 @@ class DataSource(Model):
 	id = AutoField(primary_key=True, null=False)
 	name = TextField(unique=True, null=False)
 	icon_name = TextField(null=False)
+	is_categorical = BooleanField(null=False)
 
 	class Meta:
 		database = db
