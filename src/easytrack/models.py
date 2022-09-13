@@ -4,6 +4,7 @@ from os import getenv
 
 # libs
 from peewee import AutoField, TextField, ForeignKeyField, TimestampField, IntegerField, BooleanField
+from playhouse.postgres_ext import BinaryJSONField
 from peewee import Model, PostgresqlDatabase
 import psycopg2 as pg2
 import psycopg2.extras as pg2_extras
@@ -107,7 +108,7 @@ class HourlyStats(Model):
 	participant = ForeignKeyField(Participant, on_delete='CASCADE', null=False)
 	data_source = ForeignKeyField(DataSource, on_delete='CASCADE', null=False)
 	ts = TimestampField(null=False)
-	amount = IntegerField(default=0)
+	amount = BinaryJSONField(null=False, default={})
 
 	class Meta:
 		database = db

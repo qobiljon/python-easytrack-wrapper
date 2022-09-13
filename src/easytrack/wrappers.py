@@ -17,10 +17,10 @@ from .utils import notnull, get_temp_filepath, strip_tz
 
 class DataRecord:
 	def __init__(
-			self,
-			data_source: models.DataSource,
-			ts: dt,
-			val: Dict
+		self,
+		data_source: models.DataSource,
+		ts: dt,
+		val: Dict
 	):
 		self.data_source: models.DataSource = notnull(data_source)
 		self.ts: dt = notnull(strip_tz(ts))
@@ -45,7 +45,7 @@ class DataTable:
 
 	@staticmethod
 	def __get_name(
-			participant: models.Participant
+		participant: models.Participant
 	) -> str:
 		"""
 		Returns a table name for particular campaign participant
@@ -60,7 +60,7 @@ class DataTable:
 
 	@staticmethod
 	def create(
-			participant: models.Participant
+		participant: models.Participant
 	) -> None:
 		"""
 		Creates a table for a participant to store their data
@@ -83,10 +83,10 @@ class DataTable:
 
 	@staticmethod
 	def insert(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			ts: dt,
-			val: Dict
+		participant: models.Participant,
+		data_source: models.DataSource,
+		ts: dt,
+		val: Dict
 	) -> None:
 		"""
 		Creates a data record in raw data table (e.g. sensor reading)
@@ -111,10 +111,10 @@ class DataTable:
 
 	@staticmethod
 	def select_next_k(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			from_ts: dt,
-			limit: int
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		limit: int
 	) -> List[DataRecord]:
 		"""
 		Retrieves next k data records from database
@@ -145,10 +145,10 @@ class DataTable:
 
 	@staticmethod
 	def select_range(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			from_ts: dt,
-			till_ts: dt
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		till_ts: dt
 	) -> List[pg2_extras.DictRow]:
 		"""
 		Retrieves filtered data based on provided range (start and end timestamps)
@@ -180,10 +180,10 @@ class DataTable:
 
 	@staticmethod
 	def select_count(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			from_ts: dt,
-			till_ts: dt
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		till_ts: dt
 	) -> int:
 		"""
 		Retrieves amount of filtered data based on provided range (start and end timestamps)
@@ -211,8 +211,8 @@ class DataTable:
 
 	@staticmethod
 	def select_first_ts(
-			participant: models.Participant,
-			data_source: models.DataSource
+		participant: models.Participant,
+		data_source: models.DataSource
 	) -> Optional[dt]:
 		"""
 		Retrieves the first row's timestamp
@@ -235,8 +235,8 @@ class DataTable:
 
 	@staticmethod
 	def dump_to_file(
-			participant: models.Participant,
-			data_source: Optional[models.DataSource]
+		participant: models.Participant,
+		data_source: Optional[models.DataSource]
 	) -> str:
 		"""
 		Dumps content of a particular DataTable into a downloadable file
@@ -286,7 +286,7 @@ class AggDataTable:
 
 	@staticmethod
 	def __get_name(
-			participant: models.Participant
+		participant: models.Participant
 	) -> str:
 		"""
 		Returns a table name for particular campaign participant
@@ -301,7 +301,7 @@ class AggDataTable:
 
 	@staticmethod
 	def create(
-			participant: models.Participant
+		participant: models.Participant
 	) -> None:
 		"""
 		Creates a table for a participant to store their data
@@ -324,10 +324,10 @@ class AggDataTable:
 
 	@staticmethod
 	def insert(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			ts: dt,
-			val: Dict
+		participant: models.Participant,
+		data_source: models.DataSource,
+		ts: dt,
+		val: Dict
 	) -> None:
 		"""
 		Creates a data record in raw data table (e.g. sensor reading)
@@ -353,10 +353,10 @@ class AggDataTable:
 
 	@staticmethod
 	def select_next_k(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			from_ts: dt,
-			limit: int
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		limit: int
 	) -> List[DataRecord]:
 		"""
 		Retrieves next k data records from database
@@ -387,10 +387,10 @@ class AggDataTable:
 
 	@staticmethod
 	def select_range(
-			participant: models.Participant,
-			data_source: models.DataSource,
-			from_ts: dt,
-			till_ts: dt
+		participant: models.Participant,
+		data_source: models.DataSource,
+		from_ts: dt,
+		till_ts: dt
 	) -> List[DataRecord]:
 		"""
 		Retrieves filtered data based on provided range (start and end timestamps)
@@ -421,8 +421,8 @@ class AggDataTable:
 
 	@staticmethod
 	def select_last_ts(
-			participant: models.Participant,
-			data_source: models.DataSource
+		participant: models.Participant,
+		data_source: models.DataSource
 	) -> Optional[dt]:
 		"""
 		Retrieves the first row's timestamp
@@ -446,10 +446,10 @@ class AggDataTable:
 
 class DataSourceStats:
 	def __init__(
-			self,
-			data_source: models.DataSource,
-			amount_of_samples: Optional[int] = 0,
-			last_sync_time: Optional[dt] = dt.fromtimestamp(0)
+		self,
+		data_source: models.DataSource,
+		amount_of_samples: Optional[int] = 0,
+		last_sync_time: Optional[dt] = dt.fromtimestamp(0)
 	):
 		self.data_source: models.DataSource = notnull(data_source)
 		self.amount_of_samples: int = notnull(amount_of_samples)
@@ -479,7 +479,7 @@ class ParticipantStats:
 
 			self.per_data_source_stats[data_source] = DataSourceStats(
 				data_source=data_source,
-				amount_of_samples=latest_hourly_stats.amount,
+				amount_of_samples=sum([latest_hourly_stats.amount[k] for k in latest_hourly_stats.amount]),
 				last_sync_time=latest_hourly_stats.ts
 			) if latest_hourly_stats else DataSourceStats(data_source=data_source)
 
