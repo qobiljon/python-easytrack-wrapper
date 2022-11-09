@@ -102,7 +102,7 @@ class DataTable:
 		DataTable.__connect()
 		cur = DataTable.__con.cursor()
 		cur.execute(f'insert into data.{table_name}(data_source_id, ts, val) values (%s,%s,%s)', (  # noqa
-			data_source,
+			data_source.id,
 			strip_tz(ts),
 			pg2_extras.Json(val)
 		))
