@@ -2,8 +2,8 @@ from typing import List, Optional
 from datetime import datetime as dt
 
 # app
-from easytrack import models
-from easytrack.utils import notnull
+from . import models
+from .utils import notnull
 
 
 def find_user(user_id: Optional[int], email: Optional[str]) -> Optional[models.User]:

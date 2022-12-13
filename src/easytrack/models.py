@@ -1,6 +1,7 @@
 from datetime import datetime as dt
 from datetime import timedelta as td
 from typing import Optional
+from urllib import parse as urllib_parse
 
 # libs
 from peewee import AutoField, TextField, ForeignKeyField, TimestampField, IntegerField, BooleanField
@@ -12,16 +13,18 @@ import psycopg2.extras as pg2_extras
 # app
 from .utils import notnull
 
+db = PostgresqlDatabase(None)
+
 
 def init(host: str, port: str, dbname: str, user: str, password: str):
-  db = PostgresqlDatabase(host = host, port = port, database = dbname, user = user, password = password)
-  User.Meta.database = db
-  Campaign.Meta.database = db
-  DataSource.Meta.database = db
-  CampaignDataSources.Meta.database = db
-  Supervisor.Meta.database = db
-  Participant.Meta.database = db
-  HourlyStats.Meta.database = db
+  global db
+  db.init(
+    host = host,
+    port = port,
+    database = dbname,
+    user = user,
+    password = password,
+  )
 
   # create schema if necessary
   con = pg2.connect(
