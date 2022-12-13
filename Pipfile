@@ -10,6 +10,7 @@ python-dateutil = "*"
 twine = "*"
 python-dotenv = "*"
 pytz = "*"
+coverage = "*"
 
 [dev-packages]
 yapf = "*"

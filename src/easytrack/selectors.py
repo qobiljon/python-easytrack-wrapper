@@ -6,7 +6,7 @@ from . import models
 from .utils import notnull
 
 
-def find_user(user_id: Optional[int], email: Optional[str]) -> Optional[models.User]:
+def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
   """
 	Used for finding models.User object by either id or email.
 	:param user_id: id of user being queried
@@ -19,7 +19,7 @@ def find_user(user_id: Optional[int], email: Optional[str]) -> Optional[models.U
   elif email is not None:
     return models.User.get_or_none(email = email)
   else:
-    notnull(None)   # both user_id and email are None
+    return None   # both user_id and email are None
 
 
 def is_participant(user: models.User, campaign: models.Campaign) -> bool:

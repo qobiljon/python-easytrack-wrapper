@@ -35,7 +35,7 @@ def notnull(value: Any) -> Any:
 	:return: value if it is not None
 	"""
 
-  assert value is not None
+  if value is None: raise ValueError('Provided argument value is None!')
   return value
 
 
