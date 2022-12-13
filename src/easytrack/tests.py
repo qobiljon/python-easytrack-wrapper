@@ -16,11 +16,7 @@ class BaseTestCase(TestCase):
 
     load_dotenv()
 
-    test_dbname = getenv('POSTGRES_TEST_DBNAME')
-    self.assertIsNotNone(test_dbname)
-    self.assertTrue('test' in test_dbname)
-    self.postgres_dbname = test_dbname
-
+    self.postgres_dbname = getenv('POSTGRES_TEST_DBNAME')
     self.postgres_host = getenv('POSTGRES_HOST')
     self.postgres_port = getenv('POSTGRES_PORT')
     self.postgres_user = getenv('POSTGRES_USER')
@@ -66,6 +62,12 @@ class BaseTestCase(TestCase):
       data_sources = list(),
     )
 
+  def test_postgres_credentials(self):
+    for x in self.__dict__:
+      if 'postgres' not in x: continue
+      self.assertIsNotNone(self.__dict__[x])
+    self.assertTrue('test' in self.postgres_dbname)
+
 
 class TestUser(BaseTestCase):
 
@@ -78,6 +80,7 @@ class TestUser(BaseTestCase):
     self.assertFalse(mdl.User.filter(email = 'dummy').execute())
 
   def test_user_create_valid(self):
+    mdl.User.delete().execute()
     u = svc.create_user(email = 'dummy', name = 'dummy', session_key = 'dummy')
     self.assertIsInstance(u, mdl.User)
     self.assertTrue(mdl.User.filter(email = 'dummy').execute())
@@ -122,5 +125,9 @@ class TestCampaign(BaseTestCase):
 
 
 class TestDataSource(BaseTestCase):
+
   def test_data_source_create_valid(self):
-    u = self.get_user()
+    mdl.DataSource.delete().execute()
+    u = self.get_user('dummy')
+    # svc.create_data_source()
+    u.delete().execute()
