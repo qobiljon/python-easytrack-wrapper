@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from . import models as mdl
 from . import selectors as slc
 from . import services as svc
+from . import wrappers
 from datetime import datetime as dt
 from datetime import timedelta as td
 
@@ -46,6 +47,12 @@ class BaseTestCase(TestCase):
     mdl.Participant.delete().execute()
     mdl.HourlyStats.delete().execute()
 
+  def test_postgres_credentials(self):
+    for x in self.__dict__:
+      if 'postgres' not in x: continue
+      self.assertIsNotNone(self.__dict__[x])
+    self.assertTrue('test' in self.postgres_dbname)
+
   def get_user(self, email: str) -> mdl.User:
     u = slc.find_user(email = email)
     if u: u.delete().execute()
@@ -62,11 +69,10 @@ class BaseTestCase(TestCase):
       data_sources = list(),
     )
 
-  def test_postgres_credentials(self):
-    for x in self.__dict__:
-      if 'postgres' not in x: continue
-      self.assertIsNotNone(self.__dict__[x])
-    self.assertTrue('test' in self.postgres_dbname)
+  def get_data_source(self, name: str) -> mdl.DataSource:
+    ds = slc.find_data_source(name = name)
+    if ds is None: ds = svc.create_data_source(name = name, icon_name = 'dummy', is_categorical = True)
+    return ds
 
 
 class TestUser(BaseTestCase):
@@ -116,18 +122,62 @@ class TestCampaign(BaseTestCase):
     u.delete().execute()
     d.delete().execute()
 
-  def test_cascade_deletion(self):
+  def test_campaign_cascade_deletion(self):
     u = self.get_user('owner')
     self.get_campaign(user = u)
     self.assertTrue(mdl.Campaign.filter(owner = u).execute())
     u.delete().execute()
     self.assertFalse(mdl.Campaign.filter(owner = u).execute())
 
+  def test_campaign_owner_supervisor(self):
+    u = self.get_user('owner')
+    c = self.get_campaign(user=u)
+    s = slc.get_campaign_supervisors(campaign=c)
+    self.assertEquals(len(s), 1)
+    self.assertEquals(s[0].user, u)
+    self.assertEquals(s[0].campaign, c)
+
+  def test_campaign_add_supervisor(self):
+    u1 = self.get_user('u1')
+    u2 = self.get_user('u2')
+    
+    c = self.get_campaign(user=u1)
+    s1 = slc.get_campaign_supervisors(campaign=c)
+    svc.add_supervisor_to_campaign(new_user=u2,)
+
 
 class TestDataSource(BaseTestCase):
+
+  def test_data_source_create_invalid(self):
+    self.assertRaises(
+      ValueError,
+      svc.create_data_source,
+      name = None,
+      icon_name = 'dummy',
+      is_categorical = False,
+    )
+
+  def test_data_source_create_duplicate(self):
+    ds1 = self.get_data_source('dummy')
+    ds2 = svc.create_data_source(name = 'dummy', icon_name = 'dummy', is_categorical = True)
+    self.assertEquals(ds1.id, ds2.id)
 
   def test_data_source_create_valid(self):
     mdl.DataSource.delete().execute()
     u = self.get_user('dummy')
-    # svc.create_data_source()
+    ds = svc.create_data_source(name = 'dummy', icon_name = 'dummy', is_categorical = False)
+    self.assertIsInstance(ds, mdl.DataSource)
+    self.assertTrue(mdl.DataSource.filter(id = ds.id).execute())
+    ds.delete().execute()
     u.delete().execute()
+
+  def test_data_source_bind(self):
+    u = self.get_user('owner')
+    c = self.get_campaign(user = u)
+    ds = self.get_data_source('data source')
+
+    p1 = self.get_user('p1')
+    p2 = self.get_user('p2')
+    p3 = self.get_user('p3')
+
+    svc.add_campaign_data_source(campaign = c, data_source = ds)

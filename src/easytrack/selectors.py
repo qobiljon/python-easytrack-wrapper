@@ -116,10 +116,7 @@ def get_supervisor_campaigns(user: models.User) -> List[models.Campaign]:
   return list(map(lambda supervisor: supervisor.campaign, models.Supervisor.filter(user = notnull(user))))
 
 
-def find_data_source(
-  data_source_id: Optional[int],
-  name: Optional[str],
-) -> Optional[models.DataSource]:
+def find_data_source(data_source_id: int = None, name: str = None) -> Optional[models.DataSource]:
   """
 	Used for finding DataSource object by either id or name.
 	:param data_source_id: id of data source being queried
@@ -132,7 +129,7 @@ def find_data_source(
   elif name is not None:
     return models.DataSource.get_or_none(name = name)
   else:
-    notnull(None)   # both data_source_id and name are None
+    return None   # both data_source_id and name are None
 
 
 def get_all_data_sources() -> List[models.DataSource]:
@@ -156,8 +153,12 @@ def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSour
         models.CampaignDataSources.filter(campaign = notnull(campaign))))
 
 
-def get_filtered_amount_of_data(participant: models.Participant, data_source: models.DataSource, from_ts: dt,
-                                till_ts: dt) -> int:
+def get_filtered_amount_of_data(
+  participant: models.Participant,
+  data_source: models.DataSource,
+  from_ts: dt,
+  till_ts: dt,
+) -> int:
   """
 	Computes and returns the amount of data during specified period
 	:param participant: participant being queried
