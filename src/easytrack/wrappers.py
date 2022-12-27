@@ -22,60 +22,83 @@ class DataRecord:
     self.val: Dict = notnull(val)
 
 
-class DataTable:
-  # connections for each campaign(id)
-  __cons: Dict[int, pg2_extras.DictConnection] = dict()
+class Connections:
+  __connections: Dict[str, pg2_extras.DictConnection] = dict()
 
-  def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
-    if participant.campaign.id not in DataTable.__cons:
-      schema_name = DataTable.__get_schema_name()
-
-      DataTable.__cons[participant.campaign.id] = pg2.connect(
+  @staticmethod
+  def get(schema_name: str):
+    if schema_name not in Connections.__connections:
+      con = pg2.connect(
         host = notnull(getenv(key = 'POSTGRES_HOST')),
         port = notnull(getenv(key = 'POSTGRES_PORT')),
         dbname = notnull(getenv(key = 'POSTGRES_DBNAME')),
         user = notnull(getenv(key = 'POSTGRES_USER')),
         password = notnull(getenv(key = 'POSTGRES_PASSWORD')),
-        options = f'-c search_path={schema_name}',
+        options = f'-c search_path=core,{schema_name}',
         cursor_factory = pg2_extras.DictCursor,
       )
+      with con.cursor() as cur:
+        cur.execute(f'create schema if not exists {schema_name}')
+      Connections.__connections[schema_name] = con
 
-      # create schema if doesn't exist yet
-      cur = DataTable.__cons[participant.campaign.id].cursor()
-      cur.execute(f'create schema if not exists {schema_name}')
-      cur.close()
-    self.con = DataTable.__cons[participant.campaign.id]
+    return Connections.__connections[schema_name]
 
+  @staticmethod
+  def closeAll(commit: bool = True):
+    for x in Connections.__connections:
+      if commit: Connections.__connections[x].commit()
+      Connections.__connections[x].close()
+      del Connections.__connections[x]
+
+
+class DataTable:
+
+  def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
+    self.schema_name = f'c{participant.campaign.id}'
+    self.table_name = f'u{participant.user.id}d{data_source.id}'
     self.campaign_id = participant.campaign.id
     self.user_id = participant.user.id
     self.data_source_id = data_source.id
     self.is_categorical = data_source.is_categorical
 
-    self.schema_name = f'campaign_{participant.campaign.id}'
-    self.table_name = '_'.join([
-      f'c{participant.campaign.id}',
-      f'u{participant.user.id}',
-      f'd{data_source.id}',
-    ])
-
   def create_table(self):
-    """
-		Creates a table for a participant to store their data
-		:param participant: user participating in a campaign
-		:return:
-		"""
+    """Creates a data table for a participant and data source if doesn't exist already"""
+
+    con = Connections.get(schema_name = self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'''
+        create table if not exists {self.schema_name}.{self.table_name}(
+          data_source_id int references core.data_source (id),
+          ts timestamp,
+          val {"text" if self.is_categorical else "float"}
+        )
+        ''')
+      cur.execute(f'create index if not exists idx_{self.table_name}_ts on {self.schema_name}.{self.table_name} (ts)')
+    con.commit()
+
+  def drop_table(self):
+    """Drops a data table for a participant and data source if exist already"""
+
+    con = Connections.get(schema_name = self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'drop table if exists {self.schema_name}.{self.table_name}')
+      cur.execute(f'drop index if exists idx_{self.table_name}_ts')
+    con.commit()
+
+  def table_exists(self):
+    """Creates a data table for a participant and data source if doesn't exist already"""
 
     cur = self.con.cursor()
     cur.execute(f'''
-      create table if not exists {self.schema_name}.{self.table_name}(
-        data_source_id int references core.data_source (id),
-        ts timestamp,
-        val {"text" if self.data_source.is_categorical else "float"}
-      )
+      select exists(
+        select from pg_tables
+        where schemaname = {self.schema_name} and tablename = {self.table_name}
+      );
       ''')
-    cur.execute(f'create index if not exists idx_{self.table_name}_ts on {self.schema_name}.{self.table_name} (ts)')
+    ans = next(cur.fetchone())
     cur.close()
     self.con.commit()
+    return ans
 
   def insert(self, ts: dt, val: Any):
     """
@@ -218,36 +241,30 @@ class AggDataTable:
   __cons: Dict[int, pg2_extras.DictConnection] = dict()
 
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
-    if participant.campaign.id not in AggDataTable.__cons:
-      schema_name = DataTable.__get_schema_name()
-
-      DataTable.__cons[participant.campaign.id] = pg2.connect(
-        host = notnull(getenv(key = 'POSTGRES_HOST')),
-        port = notnull(getenv(key = 'POSTGRES_PORT')),
-        dbname = notnull(getenv(key = 'POSTGRES_DBNAME')),
-        user = notnull(getenv(key = 'POSTGRES_USER')),
-        password = notnull(getenv(key = 'POSTGRES_PASSWORD')),
-        options = f'-c search_path={schema_name}',
-        cursor_factory = pg2_extras.DictCursor,
-      )
-
-      # create schema if doesn't exist yet
-      cur = DataTable.__cons[participant.campaign.id].cursor()
-      cur.execute(f'create schema if not exists {schema_name}')
-      cur.close()
-    self.con = AggDataTable.__cons[participant.campaign.id]
+    self.schema_name = f'c{participant.campaign.id}'
+    self.table_name = f'u{participant.user.id}d{data_source.id}_aggregated'
 
     self.campaign_id = participant.campaign.id
     self.user_id = participant.user.id
     self.data_source_id = data_source.id
     self.is_categorical = data_source.is_categorical
 
-    self.schema_name = f'campaign_{participant.campaign.id}'
-    self.table_name = '_'.join([
-      f'c{participant.campaign.id}',
-      f'u{participant.user.id}',
-      f'd{data_source.id}',
-    ]) + '_aggregated'
+    if participant.campaign.id not in AggDataTable.__cons:
+      AggDataTable.__cons[participant.campaign.id] = pg2.connect(
+        host = notnull(getenv(key = 'POSTGRES_HOST')),
+        port = notnull(getenv(key = 'POSTGRES_PORT')),
+        dbname = notnull(getenv(key = 'POSTGRES_DBNAME')),
+        user = notnull(getenv(key = 'POSTGRES_USER')),
+        password = notnull(getenv(key = 'POSTGRES_PASSWORD')),
+        options = f'-c search_path={self.schema_name}',
+        cursor_factory = pg2_extras.DictCursor,
+      )
+
+      # create schema if doesn't exist yet
+      cur = AggDataTable.__cons[participant.campaign.id].cursor()
+      cur.execute(f'create schema if not exists {self.schema_name}')
+      cur.close()
+    self.con = AggDataTable.__cons[participant.campaign.id]
 
   def create_table(self):
     """
@@ -261,10 +278,19 @@ class AggDataTable:
       create table if not exists {self.schema_name}.{self.table_name}(
         data_source_id int references core.data_source (id),
         ts timestamp,
-        val {"text" if self.data_source.is_categorical else "float"}
+        val {"text" if self.is_categorical else "float"}
       )
       ''')
     cur.execute(f'create index if not exists idx_{self.table_name}_ts on {self.schema_name}.{self.table_name}(ts)')
+    cur.close()
+    self.con.commit()
+
+  def drop_table(self):
+    """Drops a data table for a participant and data source if exist already"""
+
+    cur = self.con.cursor()
+    cur.execute(f'drop table if exists {self.schema_name}.{self.table_name}')
+    cur.execute(f'drop index if exists idx_{self.table_name}_ts')
     cur.close()
     self.con.commit()
 
@@ -372,7 +398,7 @@ class ParticipantStats:
     self.amount_of_data: int = 0
     self.last_sync_ts: dt = dt.fromtimestamp(0)
     data_sources: List[mdl.DataSource] = list(
-      map(lambda x: x.data_source, mdl.CampaignDataSources.filter(campaign = participant.campaign)))
+      map(lambda x: x.data_source, mdl.CampaignDataSource.filter(campaign = participant.campaign)))
     for data_source in sorted(data_sources, key = lambda x: x.name):
       latest_hourly_stats: Optional[mdl.HourlyStats] = mdl.HourlyStats.filter(participant = participant,
                                                                               data_source = data_source).order_by(

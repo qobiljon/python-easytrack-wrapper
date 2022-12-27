@@ -150,7 +150,7 @@ def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSour
 
   return list(
     map(lambda campaign_data_source: campaign_data_source.data_source,
-        models.CampaignDataSources.filter(campaign = notnull(campaign))))
+        models.CampaignDataSource.filter(campaign = notnull(campaign))))
 
 
 def get_filtered_amount_of_data(
@@ -205,4 +205,4 @@ def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataS
 	:return: whether data source is used by campaign
 	"""
 
-  return models.CampaignDataSources.filter(campaign = campaign, data_source = data_source).exists()
+  return models.CampaignDataSource.filter(campaign = campaign, data_source = data_source).exists()

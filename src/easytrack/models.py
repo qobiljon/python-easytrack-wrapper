@@ -42,7 +42,7 @@ def init(host: str, port: str, dbname: str, user: str, password: str):
 
   # connect and prepare tables
   db.connect()
-  db.create_tables([User, Campaign, DataSource, CampaignDataSources, Supervisor, Participant, HourlyStats])
+  db.create_tables([User, Campaign, DataSource, CampaignDataSource, Supervisor, Participant, HourlyStats])
 
 
 class User(Model):
@@ -83,7 +83,7 @@ class DataSource(Model):
     schema = 'core'
 
 
-class CampaignDataSources(Model):
+class CampaignDataSource(Model):
   campaign = ForeignKeyField(Campaign, on_delete = 'CASCADE', null = False)
   data_source = ForeignKeyField(DataSource, on_delete = 'CASCADE', null = False)
 

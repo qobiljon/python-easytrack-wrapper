@@ -39,10 +39,15 @@ class BaseTestCase(TestCase):
     return super().tearDown()
 
   def __cleanup(self):
+    for p in mdl.Participant.select():
+      for cds in mdl.CampaignDataSource.filter(campaign = p.campaign):
+        wrappers.DataTable(participant = p, data_source = cds.data_source).drop_table()
+        wrappers.AggDataTable(participant = p, data_source = cds.data_source).drop_table()
+
     mdl.User.delete().execute()
     mdl.Campaign.delete().execute()
     mdl.DataSource.delete().execute()
-    mdl.CampaignDataSources.delete().execute()
+    mdl.CampaignDataSource.delete().execute()
     mdl.Supervisor.delete().execute()
     mdl.Participant.delete().execute()
     mdl.HourlyStats.delete().execute()
@@ -60,7 +65,7 @@ class BaseTestCase(TestCase):
 
   def get_campaign(self, user: mdl.User) -> mdl.Campaign:
     cs = slc.get_supervisor_campaigns(user = user)
-    if cs: return cs[0]
+    if cs: return next(iter(cs))
     return svc.create_campaign(
       owner = user,
       name = 'dummy',
@@ -75,7 +80,7 @@ class BaseTestCase(TestCase):
     return ds
 
 
-class TestUser(BaseTestCase):
+class UserTestCase(BaseTestCase):
 
   def test_user_create_invalid(self):
     d = dict(email = 'dummy', name = 'dummy', session_key = 'dummy')
@@ -93,7 +98,7 @@ class TestUser(BaseTestCase):
     u.delete().execute()
 
 
-class TestCampaign(BaseTestCase):
+class CampaignTestCase(BaseTestCase):
 
   def test_campaign_create_invalid_time(self):
     u = self.get_user('owner')
@@ -131,22 +136,36 @@ class TestCampaign(BaseTestCase):
 
   def test_campaign_owner_supervisor(self):
     u = self.get_user('owner')
-    c = self.get_campaign(user=u)
-    s = slc.get_campaign_supervisors(campaign=c)
-    self.assertEquals(len(s), 1)
-    self.assertEquals(s[0].user, u)
-    self.assertEquals(s[0].campaign, c)
+    c = self.get_campaign(user = u)
+    s = slc.get_campaign_supervisors(campaign = c)
+    self.assertEqual(len(s), 1)
+    self.assertEqual(next(iter(s)).user, u)
+    self.assertEqual(next(iter(s)).campaign, c)
 
   def test_campaign_add_supervisor(self):
     u1 = self.get_user('u1')
+    c = self.get_campaign(user = u1)
+    s1 = next(iter(slc.get_campaign_supervisors(campaign = c)))
+
     u2 = self.get_user('u2')
-    
-    c = self.get_campaign(user=u1)
-    s1 = slc.get_campaign_supervisors(campaign=c)
-    svc.add_supervisor_to_campaign(new_user=u2,)
+    svc.add_supervisor_to_campaign(new_user = u2, supervisor = s1)
+    self.assertEqual({u1, u2}, {x.user for x in slc.get_campaign_supervisors(campaign = c)})
 
 
-class TestDataSource(BaseTestCase):
+class ParticipantTestCase(BaseTestCase):
+
+  def test_participant_add(self):
+    c = self.get_campaign(user = self.get_user('researcher'))
+
+    u = self.get_user('participant')
+    svc.add_campaign_participant(campaign = c, add_user = u)
+
+    p = slc.get_participant(user = u, campaign = c)
+    self.assertIsNotNone(p)
+    self.assertIn(p, slc.get_campaign_participants(campaign = c))
+
+
+class DataSourceTestCase(BaseTestCase):
 
   def test_data_source_create_invalid(self):
     self.assertRaises(
@@ -160,7 +179,7 @@ class TestDataSource(BaseTestCase):
   def test_data_source_create_duplicate(self):
     ds1 = self.get_data_source('dummy')
     ds2 = svc.create_data_source(name = 'dummy', icon_name = 'dummy', is_categorical = True)
-    self.assertEquals(ds1.id, ds2.id)
+    self.assertEqual(ds1.id, ds2.id)
 
   def test_data_source_create_valid(self):
     mdl.DataSource.delete().execute()
@@ -172,12 +191,23 @@ class TestDataSource(BaseTestCase):
     u.delete().execute()
 
   def test_data_source_bind(self):
-    u = self.get_user('owner')
-    c = self.get_campaign(user = u)
-    ds = self.get_data_source('data source')
+    c = self.get_campaign(user = self.get_user('researcher'))
 
-    p1 = self.get_user('p1')
-    p2 = self.get_user('p2')
-    p3 = self.get_user('p3')
-
+    ds = self.get_data_source('dummy')
     svc.add_campaign_data_source(campaign = c, data_source = ds)
+
+    dss = slc.get_campaign_data_sources(campaign = c)
+    self.assertIn(ds, dss)
+
+
+class DataTableTestCase(BaseTestCase):
+
+  def test_data_source_addition(self):
+    c = self.get_campaign(user = self.get_user('researcher'))
+    svc.add_campaign_participant(campaign = c, add_user = self.get_user('participant'))
+    p = next(iter(slc.get_campaign_participants(campaign = c)))
+
+    for x in range(10):
+      ds = self.get_data_source(f'ds_{x}')
+      svc.add_campaign_data_source(campaign = c, data_source = ds)
+      self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())

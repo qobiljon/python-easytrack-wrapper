@@ -32,7 +32,7 @@ def set_user_session_key(user: mdl.User, new_session_key: str) -> None:
   user.save()
 
 
-def add_participant_to_campaign(add_user: mdl.User, campaign: mdl.Campaign) -> bool:
+def add_campaign_participant(campaign: mdl.Campaign, add_user: mdl.User) -> bool:
   """
 	Binds user with campaign, making a participant.
 	After binding is done, creates a new Data table for storing the participant's data.
@@ -48,8 +48,9 @@ def add_participant_to_campaign(add_user: mdl.User, campaign: mdl.Campaign) -> b
   participant = mdl.Participant.create(campaign = campaign, user = add_user)
 
   # 2. create a new data table for the participant
-  wrappers.DataTable.create(participant = participant)
-  wrappers.AggDataTable.create(participant = participant)
+  for ds in slc.get_campaign_data_sources(campaign = campaign):
+    wrappers.DataTable(participant = participant, data_source = ds).create_table()
+    wrappers.AggDataTable(participant = participant, data_source = ds).create_table()
 
   return True
 
@@ -132,9 +133,9 @@ def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource
   if slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
     return
 
-  ds = mdl.CampaignDataSources.create(campaign = campaign, data_source = data_source)
+  mdl.CampaignDataSource.create(campaign = campaign, data_source = data_source)
   for p in slc.get_campaign_participants(campaign):
-    wrappers.DataTable(p, ds).create_table()
+    wrappers.DataTable(p, data_source).create_table()
 
 
 def remove_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource) -> None:
@@ -148,7 +149,7 @@ def remove_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSou
   if not slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
     return
 
-  for campaign_data_source in mdl.CampaignDataSources.filter(campaign = campaign, data_source = data_source):
+  for campaign_data_source in mdl.CampaignDataSource.filter(campaign = campaign, data_source = data_source):
     campaign_data_source.delete_instance()
 
 
