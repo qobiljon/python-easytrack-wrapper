@@ -38,7 +38,7 @@ def add_campaign_participant(campaign: mdl.Campaign, add_user: mdl.User) -> bool
 	After binding is done, creates a new Data table for storing the participant's data.
 	:param add_user: User object to be bound to a campaign
 	:param campaign: Campaign object that user binds with
-	:return: whether user has been bound
+	:return: whether user has been bound (false if already bound)
 	"""
 
   if slc.is_participant(user = notnull(add_user), campaign = notnull(campaign)):

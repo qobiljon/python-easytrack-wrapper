@@ -1,7 +1,5 @@
 from datetime import datetime as dt
 from datetime import timedelta as td
-from typing import Optional
-from urllib import parse as urllib_parse
 
 # libs
 from peewee import AutoField, TextField, ForeignKeyField, TimestampField, IntegerField, BooleanField

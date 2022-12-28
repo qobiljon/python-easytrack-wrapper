@@ -10,5 +10,5 @@ setup(
   package_dir = {'': 'src'},
   url = 'https://github.com/easy-track/easytrack',
   keywords = 'easytrack boilerplate',
-  install_requires = ['psycopg2-binary', 'peewee', 'python-dateutil', 'python-dotenv', 'pytz'],
+  install_requires = ['psycopg2-binary', 'peewee', 'python-dateutil', 'pytz'],
 )

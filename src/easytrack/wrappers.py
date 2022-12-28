@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, OrderedDict
 from datetime import timedelta as td
 from datetime import datetime as dt
-from os import getenv
+from abc import ABC
 import collections
 import pytz
 
@@ -28,12 +28,13 @@ class Connections:
   @staticmethod
   def get(schema_name: str):
     if schema_name not in Connections.__connections:
+      from . import postgres_host, postgres_port, postgres_dbname, postgres_user, postgres_password
       con = pg2.connect(
-        host = notnull(getenv(key = 'POSTGRES_HOST')),
-        port = notnull(getenv(key = 'POSTGRES_PORT')),
-        dbname = notnull(getenv(key = 'POSTGRES_DBNAME')),
-        user = notnull(getenv(key = 'POSTGRES_USER')),
-        password = notnull(getenv(key = 'POSTGRES_PASSWORD')),
+        host = postgres_host,
+        port = postgres_port,
+        dbname = postgres_dbname,
+        user = postgres_user,
+        password = postgres_password,
         options = f'-c search_path=core,{schema_name}',
         cursor_factory = pg2_extras.DictCursor,
       )
@@ -52,11 +53,15 @@ class Connections:
       del Connections.__connections[x]
 
 
-class DataTable:
+class BaseDataTableWrapper(ABC):
+
+  @staticmethod
+  def get_schemaname(campaign: mdl.Campaign):
+    return f'c{campaign.id}'
 
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
-    self.schema_name = f'c{participant.campaign.id}'
-    self.table_name = f'u{participant.user.id}d{data_source.id}'
+    self.schema_name = BaseDataTableWrapper.get_schemaname(campaign = participant.campaign)
+    self.table_name = f'u{participant.user.id}d{data_source.id}_aggregated'
     self.campaign_id = participant.campaign.id
     self.user_id = participant.user.id
     self.data_source_id = data_source.id
@@ -93,10 +98,13 @@ class DataTable:
     with con.cursor() as cur:
       cur.execute(f'''
         select exists(
-          select from pg_tables
-          where schemaname = '{self.schema_name}' and tablename = '{self.table_name}'
-        ) as exists;
-        ''')
+          select
+            from pg_tables
+          where
+            schemaname = '{self.schema_name}' and
+            tablename = '{self.table_name}'
+        ) as exists
+      ''')
       ans = cur.fetchone()['exists']
 
     return ans
@@ -182,6 +190,12 @@ class DataTable:
         ))
     return ans
 
+
+class DataTable(BaseDataTableWrapper):
+
+  def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
+    super().__init__(participant = participant, data_source = data_source)
+
   def select_count(self, from_ts: dt, till_ts: dt) -> int:
     """
 		Retrieves amount of filtered data based on provided range (start and end timestamps)
@@ -239,135 +253,11 @@ class DataTable:
     return ans
 
 
-class AggDataTable:
+class AggDataTable(BaseDataTableWrapper):
 
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
-    self.schema_name = f'c{participant.campaign.id}'
+    super().__init__(participant = participant, data_source = data_source)
     self.table_name = f'u{participant.user.id}d{data_source.id}_aggregated'
-    self.campaign_id = participant.campaign.id
-    self.user_id = participant.user.id
-    self.data_source_id = data_source.id
-    self.is_categorical = data_source.is_categorical
-
-  def create_table(self):
-    """Creates a data table for a participant and data source if doesn't exist already"""
-
-    con = Connections.get(schema_name = self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(f'''
-        create table if not exists {self.schema_name}.{self.table_name}(
-          data_source_id int references core.data_source (id),
-          ts timestamp,
-          val {"text" if self.is_categorical else "float"}
-        )
-        ''')
-      cur.execute(f'create index if not exists idx_{self.table_name}_ts on {self.schema_name}.{self.table_name} (ts)')
-    con.commit()
-
-  def drop_table(self):
-    """Drops a data table for a participant and data source if exist already"""
-
-    con = Connections.get(schema_name = self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(f'drop table if exists {self.schema_name}.{self.table_name}')
-      cur.execute(f'drop index if exists idx_{self.table_name}_ts')
-    con.commit()
-
-  def table_exists(self):
-    """Creates a data table for a participant and data source if doesn't exist already"""
-
-    con = Connections.get(self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(f'''
-        select exists(
-          select from pg_tables
-          where schemaname = {self.schema_name} and tablename = {self.table_name}
-        );
-        ''')
-      ans = next(cur.fetchone())
-
-    return ans
-
-  def insert(self, ts: dt, val: Any):
-    """
-		Creates a data record in raw data table (e.g. sensor reading)
-		:param participant: participant of a campaign
-		:param data_source: data source of the data record
-		:param ts: timestamp
-		:param val: value
-		:return: None
-		"""
-
-    con = Connections.get(self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(f'insert into {self.schema_name}.{self.table_name}(data_source_id, ts, val) values (%s,%s,%s)', (
-        self.data_source.id,
-        strip_tz(ts),
-        str(val) if self.is_categorical else float(val),
-      ))
-    con.commit()
-
-  def select_next_k(self, from_ts: dt, limit: int) -> List[DataRecord]:
-    """
-		Retrieves next k data records from database
-		:param participant: participant that has refernece to user and campaign
-		:param data_source: type of data to retrieve
-		:param from_ts: starting timestamp
-		:param limit: max amount of records to query
-		:return: list of data records
-		"""
-
-    con = Connections.get(self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(
-        f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s limit %s',
-        (
-          self.data_source_id,
-          strip_tz(from_ts),
-          limit,
-        ))
-      rows = cur.fetchall()
-
-    ans = list()
-    for row in rows:
-      ans.append(
-        DataRecord(
-          data_source = mdl.DataSource.get_by_id(pk = row['data_source_id']),
-          ts = row['ts'],
-          val = row['val'],
-        ))
-    return ans
-
-  def select_range(self, from_ts: dt, till_ts: dt) -> List[DataRecord]:
-    """
-		Retrieves filtered data based on provided range (start and end timestamps)
-		:param participant: participant that has refernece to user and campaign
-		:param data_source: type of data to retrieve
-		:param from_ts: starting timestamp
-		:param till_ts: ending timestamp
-		:return: list of data records
-		"""
-
-    con = Connections.get(self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(
-        f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s',
-        (
-          self.data_source_id,
-          strip_tz(from_ts),
-          strip_tz(till_ts),
-        ))
-      rows = cur.fetchall()
-
-    ans = list()
-    for row in rows:
-      ans.append(
-        DataRecord(
-          data_source = mdl.DataSource.get_by_id(pk = row['data_source_id']),
-          ts = row['ts'],
-          val = row['val'],
-        ))
-    return ans
 
 
 class DataSourceStats:

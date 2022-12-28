@@ -149,8 +149,10 @@ def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSour
 	"""
 
   return list(
-    map(lambda campaign_data_source: campaign_data_source.data_source,
-        models.CampaignDataSource.filter(campaign = notnull(campaign))))
+    map(
+      lambda campaign_data_source: campaign_data_source.data_source,
+      models.CampaignDataSource.filter(campaign = notnull(campaign)),
+    ))
 
 
 def get_filtered_amount_of_data(
