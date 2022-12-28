@@ -39,6 +39,7 @@ class Connections:
       )
       with con.cursor() as cur:
         cur.execute(f'create schema if not exists {schema_name}')
+      con.commit()
       Connections.__connections[schema_name] = con
 
     return Connections.__connections[schema_name]
@@ -88,16 +89,16 @@ class DataTable:
   def table_exists(self):
     """Creates a data table for a participant and data source if doesn't exist already"""
 
-    cur = self.con.cursor()
-    cur.execute(f'''
-      select exists(
-        select from pg_tables
-        where schemaname = {self.schema_name} and tablename = {self.table_name}
-      );
-      ''')
-    ans = next(cur.fetchone())
-    cur.close()
-    self.con.commit()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'''
+        select exists(
+          select from pg_tables
+          where schemaname = '{self.schema_name}' and tablename = '{self.table_name}'
+        ) as exists;
+        ''')
+      ans = cur.fetchone()['exists']
+
     return ans
 
   def insert(self, ts: dt, val: Any):
@@ -110,14 +111,14 @@ class DataTable:
 		:return: None
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(f'insert into {self.schema_name}.{self.table_name}(data_source_id, ts, val) values (%s,%s,%s)', (
-      self.data_source.id,
-      strip_tz(ts),
-      str(val) if self.is_categorical else float(val),
-    ))
-    cur.close()
-    self.con.commit()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'insert into {self.schema_name}.{self.table_name}(data_source_id, ts, val) values (%s,%s,%s)', (
+        self.data_source.id,
+        strip_tz(ts),
+        str(val) if self.is_categorical else float(val),
+      ))
+    con.commit()
 
   def select_next_k(self, from_ts: dt, limit: int) -> List[DataRecord]:
     """
@@ -129,16 +130,16 @@ class DataTable:
 		:return: list of data records
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(
-      f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s limit %s',
-      (
-        self.data_source_id,
-        strip_tz(from_ts),
-        limit,
-      ))
-    rows = cur.fetchall()
-    cur.close()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s limit %s',
+        (
+          self.data_source_id,
+          strip_tz(from_ts),
+          limit,
+        ))
+      rows = cur.fetchall()
 
     ans = list()
     for row in rows:
@@ -160,16 +161,16 @@ class DataTable:
 		:return: list of data records
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(
-      f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s',
-      (
-        self.data_source_id,
-        strip_tz(from_ts),
-        strip_tz(till_ts),
-      ))
-    rows = cur.fetchall()
-    cur.close()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s',
+        (
+          self.data_source_id,
+          strip_tz(from_ts),
+          strip_tz(till_ts),
+        ))
+      rows = cur.fetchall()
 
     ans = list()
     for row in rows:
@@ -191,15 +192,17 @@ class DataTable:
 		:return: amount of data records within the range
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(
-      f'select count(*) from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s', (
-        self.data_source_id,
-        strip_tz(from_ts),
-        strip_tz(till_ts),
-      ))
-    ans = cur.fetchone()[0]
-    cur.close()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select count(*) from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s',
+        (
+          self.data_source_id,
+          strip_tz(from_ts),
+          strip_tz(till_ts),
+        ))
+      ans = cur.fetchone()[0]
+
     return ans
 
   def select_first_ts(self) -> Optional[dt]:
@@ -210,13 +213,13 @@ class DataTable:
 		:return: first timestamp in the table
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(
-      f'select ts from {self.schema_name}.{self.table_name} where data_source_id = %s order by ts asc limit 1',
-      (self.data_source_id,),
-    )
-    ans = list(cur.fetchall())
-    cur.close()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select ts from {self.schema_name}.{self.table_name} where data_source_id = %s order by ts asc limit 1',
+        (self.data_source_id,),
+      )
+      ans = list(cur.fetchall())
 
     return ans[0][0] if ans else None
 
@@ -228,71 +231,62 @@ class DataTable:
 		:return: path to the downloadable file
 		"""
 
-    cur = self.con.cursor()
+    con = Connections.get(self.schema_name)
     ans = get_temp_filepath(filename = self.table_name)
-    with open(file = ans, mode = 'w') as file:
+    with con.cursor() as cur, open(file = ans, mode = 'w') as file:
       cur.copy_to(file = file, table = self.table_name, sep = ',')
-    cur.close()
+
     return ans
 
 
 class AggDataTable:
-  # connections for each campaign(id)
-  __cons: Dict[int, pg2_extras.DictConnection] = dict()
 
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
     self.schema_name = f'c{participant.campaign.id}'
     self.table_name = f'u{participant.user.id}d{data_source.id}_aggregated'
-
     self.campaign_id = participant.campaign.id
     self.user_id = participant.user.id
     self.data_source_id = data_source.id
     self.is_categorical = data_source.is_categorical
 
-    if participant.campaign.id not in AggDataTable.__cons:
-      AggDataTable.__cons[participant.campaign.id] = pg2.connect(
-        host = notnull(getenv(key = 'POSTGRES_HOST')),
-        port = notnull(getenv(key = 'POSTGRES_PORT')),
-        dbname = notnull(getenv(key = 'POSTGRES_DBNAME')),
-        user = notnull(getenv(key = 'POSTGRES_USER')),
-        password = notnull(getenv(key = 'POSTGRES_PASSWORD')),
-        options = f'-c search_path={self.schema_name}',
-        cursor_factory = pg2_extras.DictCursor,
-      )
-
-      # create schema if doesn't exist yet
-      cur = AggDataTable.__cons[participant.campaign.id].cursor()
-      cur.execute(f'create schema if not exists {self.schema_name}')
-      cur.close()
-    self.con = AggDataTable.__cons[participant.campaign.id]
-
   def create_table(self):
-    """
-		Creates a table for a participant to store their data
-		:param participant: user participating in a campaign
-		:return:
-		"""
+    """Creates a data table for a participant and data source if doesn't exist already"""
 
-    cur = self.con.cursor()
-    cur.execute(f'''
-      create table if not exists {self.schema_name}.{self.table_name}(
-        data_source_id int references core.data_source (id),
-        ts timestamp,
-        val {"text" if self.is_categorical else "float"}
-      )
-      ''')
-    cur.execute(f'create index if not exists idx_{self.table_name}_ts on {self.schema_name}.{self.table_name}(ts)')
-    cur.close()
-    self.con.commit()
+    con = Connections.get(schema_name = self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'''
+        create table if not exists {self.schema_name}.{self.table_name}(
+          data_source_id int references core.data_source (id),
+          ts timestamp,
+          val {"text" if self.is_categorical else "float"}
+        )
+        ''')
+      cur.execute(f'create index if not exists idx_{self.table_name}_ts on {self.schema_name}.{self.table_name} (ts)')
+    con.commit()
 
   def drop_table(self):
     """Drops a data table for a participant and data source if exist already"""
 
-    cur = self.con.cursor()
-    cur.execute(f'drop table if exists {self.schema_name}.{self.table_name}')
-    cur.execute(f'drop index if exists idx_{self.table_name}_ts')
-    cur.close()
-    self.con.commit()
+    con = Connections.get(schema_name = self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'drop table if exists {self.schema_name}.{self.table_name}')
+      cur.execute(f'drop index if exists idx_{self.table_name}_ts')
+    con.commit()
+
+  def table_exists(self):
+    """Creates a data table for a participant and data source if doesn't exist already"""
+
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'''
+        select exists(
+          select from pg_tables
+          where schemaname = {self.schema_name} and tablename = {self.table_name}
+        );
+        ''')
+      ans = next(cur.fetchone())
+
+    return ans
 
   def insert(self, ts: dt, val: Any):
     """
@@ -304,14 +298,14 @@ class AggDataTable:
 		:return: None
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(f'insert into {self.schema_name}.{self.table_name}(data_source_id, ts, val) values(%s,%s,%s)', (
-      self.data_source.id,
-      strip_tz(ts),
-      str(val) if self.is_categorical else float(val),
-    ))
-    cur.close()
-    self.con.commit()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(f'insert into {self.schema_name}.{self.table_name}(data_source_id, ts, val) values (%s,%s,%s)', (
+        self.data_source.id,
+        strip_tz(ts),
+        str(val) if self.is_categorical else float(val),
+      ))
+    con.commit()
 
   def select_next_k(self, from_ts: dt, limit: int) -> List[DataRecord]:
     """
@@ -323,16 +317,16 @@ class AggDataTable:
 		:return: list of data records
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(
-      f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s limit %s',
-      (
-        self.data_source_id,
-        strip_tz(from_ts),
-        limit,
-      ))
-    rows = cur.fetchall()
-    cur.close()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s limit %s',
+        (
+          self.data_source_id,
+          strip_tz(from_ts),
+          limit,
+        ))
+      rows = cur.fetchall()
 
     ans = list()
     for row in rows:
@@ -354,16 +348,16 @@ class AggDataTable:
 		:return: list of data records
 		"""
 
-    cur = self.con.cursor()
-    cur.execute(
-      f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s',
-      (
-        self.data_source_id,
-        strip_tz(from_ts),
-        strip_tz(till_ts),
-      ))
-    rows = cur.fetchall()
-    cur.close()
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select data_source_id, ts, val from {self.schema_name}.{self.table_name} where data_source_id = %s and ts >= %s and ts < %s',
+        (
+          self.data_source_id,
+          strip_tz(from_ts),
+          strip_tz(till_ts),
+        ))
+      rows = cur.fetchall()
 
     ans = list()
     for row in rows:
