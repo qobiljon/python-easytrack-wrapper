@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
   name = 'python-easytrack',
-  version = '1.0.14',
+  version = '1.1.0',
   license = 'MIT',
   author = "Kobiljon Toshnazarov",
   author_email = 'kobiljon.toshnazarov@gmail.com',
