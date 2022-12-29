@@ -3,6 +3,9 @@ from os import getenv
 from dotenv import load_dotenv
 import psycopg2 as pg2
 from psycopg2 import extras as pg2_extras
+from datetime import datetime as dt
+from datetime import timedelta as td
+from random import randint
 
 from . import models as mdl
 from . import selectors as slc
@@ -10,8 +13,6 @@ from . import services as svc
 from . import wrappers
 from . import init
 from .wrappers import BaseDataTableWrapper
-from datetime import datetime as dt
-from datetime import timedelta as td
 
 
 class BaseTestCase(TestCase):
@@ -36,14 +37,14 @@ class BaseTestCase(TestCase):
       db_user = self.postgres_user,
       db_password = self.postgres_password,
     )
-    self.__cleanup()
+    self.cleanup()
     return super().setUp()
 
   def tearDown(self):
-    self.__cleanup()
+    self.cleanup()
     return super().tearDown()
 
-  def __cleanup(self):
+  def cleanup(self):
     con = pg2.connect(
       host = self.postgres_host,
       port = self.postgres_port,
@@ -54,7 +55,13 @@ class BaseTestCase(TestCase):
     )
     with con.cursor() as cur:
       for c in mdl.Campaign.select():
-        cur.execute(f"drop schema if exists {BaseDataTableWrapper.get_schemaname(c)} cascade")
+        dss = slc.get_campaign_data_sources(campaign = c)
+        for p in slc.get_campaign_participants(campaign = c):
+          for ds in dss:
+            dt = wrappers.DataTable(participant = p, data_source = ds)
+            adt = wrappers.AggDataTable(participant = p, data_source = ds)
+            if dt.table_exists(): dt.drop_table()
+            if adt.table_exists(): adt.drop_table()
 
     mdl.User.delete().execute()
     mdl.Campaign.delete().execute()
@@ -228,20 +235,45 @@ class DataTableTestCase(BaseTestCase):
     svc.add_campaign_participant(campaign = c, add_user = pu)
     p = slc.get_participant(user = pu, campaign = c)
 
-    for x in range(10):
+    for x in range(3):
       ds = self.new_data_source(f'ds_{x}')
+      self.assertFalse(wrappers.DataTable(participant = p, data_source = ds).table_exists())
       svc.add_campaign_data_source(campaign = c, data_source = ds)
       self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())
+
+    self.cleanup()
 
   def test_participant_addition(self):
     c = self.new_campaign(user = self.new_user('researcher'))
     ds = self.new_data_source('dummy data source')
     svc.add_campaign_data_source(campaign = c, data_source = ds)
 
-    for x in range(10):
+    for x in range(3):
       pu = self.new_user(f'p_{x}')
-      svc.add_campaign_participant(campaign = c, add_user = pu)
-      p = slc.get_participant(user = pu, campaign = c)
 
-      svc.add_campaign_participant(campaign = c, add_user = pu)
+      self.assertIsNone(slc.get_participant(user = pu, campaign = c))
+      self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
+      p = slc.get_participant(user = pu, campaign = c)
+      self.assertIsNotNone(p)
       self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())
+
+    self.cleanup()
+
+  def test_random_addition(self):
+    pus = list(map(lambda x: self.new_user(f'p_{x}'), range(randint(2, 5))))
+
+    c = self.new_campaign(user = self.new_user('creator'))
+    dss = list(map(lambda x: self.new_data_source(f'ds_{x}'), range(randint(2, 5))))
+    for ds in dss:
+      self.assertFalse(slc.is_campaign_data_source(campaign = c, data_source = ds))
+      svc.add_campaign_data_source(campaign = c, data_source = ds)
+      self.assertTrue(slc.is_campaign_data_source(campaign = c, data_source = ds))
+
+    for pu in pus:
+      self.assertIsNone(slc.get_participant(user = pu, campaign = c))
+      self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
+      p = slc.get_participant(user = pu, campaign = c)
+      self.assertIsNotNone(p)
+      self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())
+
+    self.cleanup()

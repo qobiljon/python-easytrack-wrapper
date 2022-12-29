@@ -55,13 +55,9 @@ class Connections:
 
 class BaseDataTableWrapper(ABC):
 
-  @staticmethod
-  def get_schemaname(campaign: mdl.Campaign):
-    return f'c{campaign.id}'
-
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
-    self.schema_name = BaseDataTableWrapper.get_schemaname(campaign = participant.campaign)
-    self.table_name = f'u{participant.user.id}d{data_source.id}_aggregated'
+    self.schema_name = 'data'
+    self.table_name = f'c{participant.campaign.id}u{participant.user.id}d{data_source.id}'
     self.campaign_id = participant.campaign.id
     self.user_id = participant.user.id
     self.data_source_id = data_source.id
@@ -195,6 +191,7 @@ class DataTable(BaseDataTableWrapper):
 
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
     super().__init__(participant = participant, data_source = data_source)
+    self.table_name = f'c{participant.campaign.id}u{participant.user.id}d{data_source.id}'
 
   def select_count(self, from_ts: dt, till_ts: dt) -> int:
     """
@@ -257,7 +254,7 @@ class AggDataTable(BaseDataTableWrapper):
 
   def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
     super().__init__(participant = participant, data_source = data_source)
-    self.table_name = f'u{participant.user.id}d{data_source.id}_aggregated'
+    self.table_name = f'c{participant.campaign.id}u{participant.user.id}d{data_source.id}_aggregated'
 
 
 class DataSourceStats:
