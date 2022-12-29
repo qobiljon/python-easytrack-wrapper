@@ -1,0 +1,26 @@
+[style]
+based_on_style = google
+column_limit = 120
+
+# tabber ¯\_(ツ)_/¯
+# use_tabs = True
+# continuation_align_style = fixed
+indent_width = 2
+continuation_indent_width = 2
+
+# blank lines
+blank_line_before_class_docstring = False
+blank_lines_around_top_level_definition = 2
+blank_line_before_nested_class_or_def = True
+
+# arithmetic ops
+no_spaces_around_selected_binary_operators = *,/
+
+# short statements
+join_multiple_lines = True
+
+# spaces around default or named assigns
+spaces_around_default_or_named_assign = True
+
+# before a trailing comment
+spaces_before_comment = 3
