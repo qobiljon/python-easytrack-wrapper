@@ -170,11 +170,15 @@ def get_filtered_amount_of_data(
 	:return: amount of samples in the range with specified filters
 	"""
 
-  current: models.HourlyStats = models.HourlyStats.get_or_none(participant = notnull(participant),
-                                                               data_source = notnull(data_source),
-                                                               ts = till_ts.replace(minute = 0,
-                                                                                    second = 0,
-                                                                                    microsecond = 0))
+  current: models.HourlyStats = models.HourlyStats.get_or_none(
+    participant = notnull(participant),
+    data_source = notnull(data_source),
+    ts = till_ts.replace(
+      minute = 0,
+      second = 0,
+      microsecond = 0,
+    ),
+  )
   if not current:
     current: models.HourlyStats = models.HourlyStats.filter(
       participant = notnull(participant),
@@ -186,11 +190,15 @@ def get_filtered_amount_of_data(
     else:
       current = list(current)[0]
 
-  back_then: models.HourlyStats = models.HourlyStats.filter(participant = notnull(participant),
-                                                            data_source = notnull(data_source),
-                                                            ts = from_ts.replace(minute = 0,
-                                                                                 second = 0,
-                                                                                 microsecond = 0))
+  back_then: models.HourlyStats = models.HourlyStats.filter(
+    participant = notnull(participant),
+    data_source = notnull(data_source),
+    ts = from_ts.replace(
+      minute = 0,
+      second = 0,
+      microsecond = 0,
+    ),
+  )
   if not back_then.exists():
     return 0
   else:
@@ -199,7 +207,7 @@ def get_filtered_amount_of_data(
   return current.amount - back_then.amount
 
 
-def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataSource) -> None:
+def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataSource):
   """
 	Checks if data source is being used by a campaign
 	:param campaign: the campaign being queried

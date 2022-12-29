@@ -1,4 +1,4 @@
-from unittest import TestCase
+from unittest import TestCase, skip
 from os import getenv
 from dotenv import load_dotenv
 import psycopg2 as pg2
@@ -277,3 +277,57 @@ class DataTableTestCase(BaseTestCase):
       self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())
 
     self.cleanup()
+
+  @skip("amount is computed by background service in latest versions")
+  def test_amount(self):
+    c = self.new_campaign(user = self.new_user('creator'))
+
+    ds = self.new_data_source('dummy')
+    svc.add_campaign_data_source(campaign = c, data_source = ds)
+    self.assertTrue(slc.is_campaign_data_source(campaign = c, data_source = ds))
+
+    pu = self.new_user('participant')
+    self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
+    p = slc.get_participant(user = pu, campaign = c)
+    self.assertIsNotNone(p)
+
+    now_ts = dt.now()
+    from_ts = now_ts.replace(year = now_ts.year - 1)
+    till_ts = now_ts.replace(year = now_ts.year + 1)
+    self.assertEquals(
+      slc.get_filtered_amount_of_data(
+        participant = p,
+        data_source = ds,
+        from_ts = from_ts,
+        till_ts = till_ts,
+      ),
+      0,
+    )
+    svc.create_data_record(participant = p, data_source = ds, ts = dt.now(), val = 1.0 if ds.is_categorical else 'abc')
+    self.assertEquals(
+      slc.get_filtered_amount_of_data(
+        participant = p,
+        data_source = ds,
+        from_ts = from_ts,
+        till_ts = till_ts,
+      ),
+      1,
+    )
+
+    rnd_amount = randint(2, 10)
+    ts0 = dt.now()
+    svc.create_data_records(
+      participant = p,
+      data_source = ds,
+      ts = [ts0 + x for x in range(rnd_amount)],
+      val = [1.0 if ds.is_categorical else 'abc' for _ in range(rnd_amount)],
+    )
+    self.assertEquals(
+      slc.get_filtered_amount_of_data(
+        participant = p,
+        data_source = ds,
+        from_ts = from_ts,
+        till_ts = till_ts,
+      ),
+      rnd_amount + 1,
+    )

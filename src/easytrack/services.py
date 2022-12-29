@@ -20,7 +20,7 @@ def create_user(email: str, name: str, session_key: str) -> mdl.User:
   return mdl.User.create(email = notnull(email), name = notnull(name), session_key = notnull(session_key))
 
 
-def set_user_session_key(user: mdl.User, new_session_key: str) -> None:
+def set_user_session_key(user: mdl.User, new_session_key: str):
   """
 	Updates a user's session key (that is used for authentication)
 	:param user: the user
@@ -75,7 +75,7 @@ def add_supervisor_to_campaign(
   return True
 
 
-def remove_supervisor_from_campaign(oldSupervisor: mdl.Supervisor) -> None:
+def remove_supervisor_from_campaign(oldSupervisor: mdl.Supervisor):
   """
 	Unbinds a (supervisor) user from campaign.
 	:param oldSupervisor: supervisor representing the binding between a user and a campaign.
@@ -122,7 +122,7 @@ def create_campaign(
   return campaign
 
 
-def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource) -> None:
+def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource):
   """
 	Adds the data source to campaign
 	:param campaign: the campaign to add data source to
@@ -138,7 +138,7 @@ def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource
     wrappers.DataTable(p, data_source).create_table()
 
 
-def remove_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource) -> None:
+def remove_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource):
   """
 	Removes the data source from campaign
 	:param campaign: the campaign to remove data source from
@@ -159,7 +159,7 @@ def update_campaign(
   start_ts: dt,
   end_ts: dt,
   data_sources: List[mdl.DataSource],
-) -> None:
+):
   """
 	Update parameters of a campaign object in the database.
 	:param supervisor: supervisor of the campaign (includes reference to user and campaign)
@@ -186,7 +186,7 @@ def update_campaign(
     add_campaign_data_source(campaign = campaign, data_source = new)
 
 
-def delete_campaign(supervisor: mdl.Supervisor) -> None:
+def delete_campaign(supervisor: mdl.Supervisor):
   """
 	Delete a campaign - must only be called if campaign's owner makes the call.
 	:param supervisor: supervisor of the campaign (includes reference to user and campaign)
@@ -212,7 +212,7 @@ def create_data_source(name: str, icon_name: str, is_categorical: bool) -> mdl.D
   return mdl.DataSource.create(name = name, icon_name = notnull(icon_name), is_categorical = notnull(is_categorical))
 
 
-def create_data_record(participant: mdl.Participant, data_source: mdl.DataSource, ts: dt, val: Dict) -> None:
+def create_data_record(participant: mdl.Participant, data_source: mdl.DataSource, ts: dt, val: float | str):
   """
 	Creates a data record in raw data table (e.g. sensor reading)
 	:param participant: participant of a campaign
@@ -222,11 +222,15 @@ def create_data_record(participant: mdl.Participant, data_source: mdl.DataSource
 	:return: None
 	"""
 
-  wrappers.DataTable.insert(participant = participant, data_source = data_source, ts = ts, val = val)
+  wrappers.DataTable(participant = participant, data_source = data_source).insert(ts = ts, val = val)
 
 
-def create_data_records(participant: mdl.Participant, data_source_ids: List[int], tss: List[dt],
-                        vals: List[Dict]) -> None:
+def create_data_records(
+  participant: mdl.Participant,
+  data_source_ids: List[int],
+  tss: List[dt],
+  vals: List[float | str],
+):
   """
 	Creates a data record in raw data table (e.g. sensor reading)
 	:param participant: participant of a campaign

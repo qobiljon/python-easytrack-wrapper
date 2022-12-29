@@ -105,7 +105,7 @@ class BaseDataTableWrapper(ABC):
 
     return ans
 
-  def insert(self, ts: dt, val: Any):
+  def insert(self, ts: dt, val: float | str):
     """
 		Creates a data record in raw data table (e.g. sensor reading)
 		:param participant: participant of a campaign
@@ -118,7 +118,7 @@ class BaseDataTableWrapper(ABC):
     con = Connections.get(self.schema_name)
     with con.cursor() as cur:
       cur.execute(f'insert into {self.schema_name}.{self.table_name}(data_source_id, ts, val) values (%s,%s,%s)', (
-        self.data_source.id,
+        self.data_source_id,
         strip_tz(ts),
         str(val) if self.is_categorical else float(val),
       ))
