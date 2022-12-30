@@ -44,7 +44,7 @@ def is_supervisor(user: models.User, campaign: models.Campaign) -> bool:
   return models.Supervisor.filter(campaign = campaign, user = user).exists()
 
 
-def get_participant(user: models.User, campaign: models.Campaign) -> models.Participant:
+def get_participant(campaign: models.Campaign, user: models.User) -> models.Participant:
   """
 	Returns a participant object depending on the user and campaign provided
 	:param user: user key to search for a participant object

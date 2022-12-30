@@ -186,6 +186,42 @@ class BaseDataTableWrapper(ABC):
         ))
     return ans
 
+  def select_first_ts(self) -> Optional[dt]:
+    """
+		Retrieves the first row's timestamp
+		:param participant: participant that has refernece to user and campaign
+		:param data_source: type of data to retrieve
+		:return: first timestamp in the table
+		"""
+
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select ts from {self.schema_name}.{self.table_name} where data_source_id = %s order by ts asc limit 1',
+        (self.data_source_id,),
+      )
+      ans = list(cur.fetchall())
+
+    return ans[0][0] if ans else None
+
+  def select_last_ts(self) -> Optional[dt]:
+    """
+		Retrieves the last row's timestamp
+		:param participant: participant that has refernece to user and campaign
+		:param data_source: type of data to retrieve
+		:return: last timestamp in the table
+		"""
+
+    con = Connections.get(self.schema_name)
+    with con.cursor() as cur:
+      cur.execute(
+        f'select ts from {self.schema_name}.{self.table_name} where data_source_id = %s order by ts desc limit 1',
+        (self.data_source_id,),
+      )
+      ans = list(cur.fetchall())
+
+    return ans[0][0] if ans else None
+
 
 class DataTable(BaseDataTableWrapper):
 
@@ -215,24 +251,6 @@ class DataTable(BaseDataTableWrapper):
       ans = cur.fetchone()[0]
 
     return ans
-
-  def select_first_ts(self) -> Optional[dt]:
-    """
-		Retrieves the first row's timestamp
-		:param participant: participant that has refernece to user and campaign
-		:param data_source: type of data to retrieve
-		:return: first timestamp in the table
-		"""
-
-    con = Connections.get(self.schema_name)
-    with con.cursor() as cur:
-      cur.execute(
-        f'select ts from {self.schema_name}.{self.table_name} where data_source_id = %s order by ts asc limit 1',
-        (self.data_source_id,),
-      )
-      ans = list(cur.fetchall())
-
-    return ans[0][0] if ans else None
 
   def dump_to_file(self) -> str:
     """

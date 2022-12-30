@@ -122,20 +122,21 @@ def create_campaign(
   return campaign
 
 
-def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource):
+def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource) -> bool:
   """
 	Adds the data source to campaign
 	:param campaign: the campaign to add data source to
 	:param data_source: data source being added
-	:return: None
+	:return: whether user has been bound (false if already bound)
 	"""
 
   if slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
-    return
+    return False
 
   mdl.CampaignDataSource.create(campaign = campaign, data_source = data_source)
   for p in slc.get_campaign_participants(campaign):
     wrappers.DataTable(p, data_source).create_table()
+  return True
 
 
 def remove_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource):

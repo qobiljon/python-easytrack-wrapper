@@ -187,7 +187,7 @@ class ParticipantTestCase(BaseTestCase):
     u = self.new_user('participant')
     svc.add_campaign_participant(campaign = c, add_user = u)
 
-    p = slc.get_participant(user = u, campaign = c)
+    p = slc.get_participant(campaign = c, user = u)
     self.assertIsNotNone(p)
     self.assertIn(p, slc.get_campaign_participants(campaign = c))
 
@@ -233,7 +233,7 @@ class DataTableTestCase(BaseTestCase):
     c = self.new_campaign(user = self.new_user('researcher'))
     pu = self.new_user('participant')
     svc.add_campaign_participant(campaign = c, add_user = pu)
-    p = slc.get_participant(user = pu, campaign = c)
+    p = slc.get_participant(campaign = c, user = pu)
 
     for x in range(3):
       ds = self.new_data_source(f'ds_{x}')
@@ -251,9 +251,9 @@ class DataTableTestCase(BaseTestCase):
     for x in range(3):
       pu = self.new_user(f'p_{x}')
 
-      self.assertIsNone(slc.get_participant(user = pu, campaign = c))
+      self.assertIsNone(slc.get_participant(campaign = c, user = pu))
       self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
-      p = slc.get_participant(user = pu, campaign = c)
+      p = slc.get_participant(campaign = c, user = pu)
       self.assertIsNotNone(p)
       self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())
 
@@ -270,9 +270,9 @@ class DataTableTestCase(BaseTestCase):
       self.assertTrue(slc.is_campaign_data_source(campaign = c, data_source = ds))
 
     for pu in pus:
-      self.assertIsNone(slc.get_participant(user = pu, campaign = c))
+      self.assertIsNone(slc.get_participant(campaign = c, user = pu))
       self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
-      p = slc.get_participant(user = pu, campaign = c)
+      p = slc.get_participant(campaign = c, user = pu)
       self.assertIsNotNone(p)
       self.assertTrue(wrappers.DataTable(participant = p, data_source = ds).table_exists())
 
@@ -288,13 +288,13 @@ class DataTableTestCase(BaseTestCase):
 
     pu = self.new_user('participant')
     self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
-    p = slc.get_participant(user = pu, campaign = c)
+    p = slc.get_participant(campaign = c, user = pu)
     self.assertIsNotNone(p)
 
     now_ts = dt.now()
     from_ts = now_ts.replace(year = now_ts.year - 1)
     till_ts = now_ts.replace(year = now_ts.year + 1)
-    self.assertEquals(
+    self.assertEqual(
       slc.get_filtered_amount_of_data(
         participant = p,
         data_source = ds,
@@ -303,8 +303,13 @@ class DataTableTestCase(BaseTestCase):
       ),
       0,
     )
-    svc.create_data_record(participant = p, data_source = ds, ts = dt.now(), val = 1.0 if ds.is_categorical else 'abc')
-    self.assertEquals(
+    svc.create_data_record(
+      participant = p,
+      data_source = ds,
+      ts = dt.now(),
+      val = 'value' if ds.is_categorical else 1.0,
+    )
+    self.assertEqual(
       slc.get_filtered_amount_of_data(
         participant = p,
         data_source = ds,
@@ -322,7 +327,7 @@ class DataTableTestCase(BaseTestCase):
       ts = [ts0 + x for x in range(rnd_amount)],
       val = [1.0 if ds.is_categorical else 'abc' for _ in range(rnd_amount)],
     )
-    self.assertEquals(
+    self.assertEqual(
       slc.get_filtered_amount_of_data(
         participant = p,
         data_source = ds,
@@ -331,3 +336,40 @@ class DataTableTestCase(BaseTestCase):
       ),
       rnd_amount + 1,
     )
+
+  def test_timestamps(self):
+    c = self.new_campaign(user = self.new_user('creator'))
+    pu = self.new_user('participant')
+    ds = self.new_data_source('data source')
+    self.assertTrue(svc.add_campaign_data_source(campaign = c, data_source = ds))
+    self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
+    p = slc.get_participant(campaign = c, user = pu)
+    self.assertIsNotNone(p)
+
+    data = wrappers.DataTable(participant = p, data_source = ds)
+    self.assertTrue(data.table_exists())
+    now_ts = dt.now()
+    self.assertEqual(
+      data.select_count(
+        from_ts = now_ts.replace(year = now_ts.year - 1),
+        till_ts = now_ts.replace(year = now_ts.year + 1),
+      ),
+      0,
+    )
+    self.assertIsNone(data.select_first_ts())
+    self.assertIsNone(data.select_last_ts())
+    data.insert(ts = now_ts, val = 'value' if ds.is_categorical else 1.0)
+    data.insert(ts = now_ts + td(seconds = 1), val = 'value' if ds.is_categorical else 1.0)
+    self.assertEqual(
+      data.select_count(
+        from_ts = now_ts.replace(year = now_ts.year - 1),
+        till_ts = now_ts.replace(year = now_ts.year + 1),
+      ),
+      2,
+    )
+
+    first_ts, last_ts = data.select_first_ts(), data.select_last_ts()
+    self.assertIsNotNone(first_ts)
+    self.assertIsNotNone(last_ts)
+    self.assertGreater(last_ts, first_ts)
+    self.assertEqual(last_ts - first_ts, td(seconds = 1))
