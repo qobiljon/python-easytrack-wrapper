@@ -55,10 +55,7 @@ def add_campaign_participant(campaign: mdl.Campaign, add_user: mdl.User) -> bool
   return True
 
 
-def add_supervisor_to_campaign(
-  new_user: mdl.User,
-  supervisor: mdl.Supervisor,
-) -> bool:
+def add_supervisor_to_campaign(supervisor: mdl.Supervisor, new_user: mdl.User) -> bool:
   """
 	Binds user with campaign, making a supervisor.
 	:param new_user: User object to be bound to a campaign as a supervisor

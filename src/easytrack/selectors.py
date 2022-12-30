@@ -22,7 +22,7 @@ def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
     return None   # both user_id and email are None
 
 
-def is_participant(user: models.User, campaign: models.Campaign) -> bool:
+def is_participant(campaign: models.Campaign, user: models.User) -> bool:
   """
 	Checks whether a user is a campaign's participant or not
 	:param user: user being checked
@@ -33,7 +33,7 @@ def is_participant(user: models.User, campaign: models.Campaign) -> bool:
   return models.Participant.filter(campaign = notnull(campaign), user = notnull(user)).exists()
 
 
-def is_supervisor(user: models.User, campaign: models.Campaign) -> bool:
+def is_supervisor(campaign: models.Campaign, user: models.User) -> bool:
   """
 	Checks whether a user is a campaign's supervisor or not
 	:param user: user being checked
@@ -55,7 +55,7 @@ def get_participant(campaign: models.Campaign, user: models.User) -> models.Part
   return models.Participant.get_or_none(campaign = notnull(campaign), user = notnull(user))
 
 
-def get_supervisor(user: models.User, campaign: models.Campaign) -> models.Supervisor:
+def get_supervisor(campaign: models.Campaign, user: models.User) -> models.Supervisor:
   """
 	Returns a supervisor object depending on the user and campaign provided
 	:param user: user key to search for a supervisor object
