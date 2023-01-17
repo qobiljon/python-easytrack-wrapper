@@ -105,7 +105,7 @@ class BaseDataTableWrapper(ABC):
 
     return ans
 
-  def insert(self, ts: dt, val: Union[float, str]):
+  def insert(self, ts: dt, val: Union[float, str], commit: bool = True):
     """
 		Creates a data record in raw data table (e.g. sensor reading)
 		:param participant: participant of a campaign
@@ -122,6 +122,10 @@ class BaseDataTableWrapper(ABC):
         strip_tz(ts),
         str(val) if self.is_categorical else float(val),
       ))
+    if commit: con.commit()
+
+  def commit(self):
+    con = Connections.get(self.schema_name)
     con.commit()
 
   def select_next_k(self, from_ts: dt, limit: int) -> List[DataRecord]:
