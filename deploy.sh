@@ -2,7 +2,7 @@ export PYTHONUNBUFFERED=1
 export PIPENV_VERBOSITY=-1
 
 echo 'Test goes first! running tests...'
-if pipenv run python -m unittest './src/easytrack/tests.py'; then
+if pipenv run python -m unittest src.easytrack.tests; then
   echo 'Tests passed =)'
   echo 'Deploying...'
 
