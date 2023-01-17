@@ -1,5 +1,5 @@
 from datetime import datetime as dt
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 # app
 from . import selectors as slc
@@ -210,7 +210,7 @@ def create_data_source(name: str, icon_name: str, is_categorical: bool) -> mdl.D
   return mdl.DataSource.create(name = name, icon_name = notnull(icon_name), is_categorical = notnull(is_categorical))
 
 
-def create_data_record(participant: mdl.Participant, data_source: mdl.DataSource, ts: dt, val: float | str):
+def create_data_record(participant: mdl.Participant, data_source: mdl.DataSource, ts: dt, val: Union[float, str]):
   """
 	Creates a data record in raw data table (e.g. sensor reading)
 	:param participant: participant of a campaign
@@ -227,7 +227,7 @@ def create_data_records(
   participant: mdl.Participant,
   data_source_ids: List[int],
   tss: List[dt],
-  vals: List[float | str],
+  vals: List[Union[float, str]],
 ):
   """
 	Creates a data record in raw data table (e.g. sensor reading)

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, OrderedDict
+from typing import Any, Dict, List, Optional, OrderedDict, Union
 from datetime import timedelta as td
 from datetime import datetime as dt
 from abc import ABC
@@ -105,7 +105,7 @@ class BaseDataTableWrapper(ABC):
 
     return ans
 
-  def insert(self, ts: dt, val: float | str):
+  def insert(self, ts: dt, val: Union[float, str]):
     """
 		Creates a data record in raw data table (e.g. sensor reading)
 		:param participant: participant of a campaign
