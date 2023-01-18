@@ -373,3 +373,49 @@ class DataTableTestCase(BaseTestCase):
     self.assertIsNotNone(last_ts)
     self.assertGreater(last_ts, first_ts)
     self.assertEqual(last_ts - first_ts, td(seconds = 1))
+
+  def test_amounts_wrapper(self):
+    c = self.new_campaign(user = self.new_user('creator'))
+
+    ds = self.new_data_source('dummy')
+    svc.add_campaign_data_source(campaign = c, data_source = ds)
+    self.assertTrue(slc.is_campaign_data_source(campaign = c, data_source = ds))
+
+    pu = self.new_user('participant')
+    self.assertTrue(svc.add_campaign_participant(campaign = c, add_user = pu))
+    p = slc.get_participant(campaign = c, user = pu)
+    self.assertIsNotNone(p)
+
+    now_ts = dt.now()
+    from_ts = now_ts.replace(year = now_ts.year - 1)
+    till_ts = now_ts.replace(year = now_ts.year + 1)
+    data_table = wrappers.DataTable(participant = p, data_source = ds)
+    self.assertEqual(
+      data_table.select_count(from_ts = from_ts, till_ts = till_ts),
+      0,
+    )
+    svc.create_data_record(
+      participant = p,
+      data_source = ds,
+      ts = dt.now(),
+      val = 'value' if ds.is_categorical else 1.0,
+    )
+    wrappers.Connections.get(data_table.schema_name).commit()
+    self.assertEqual(
+      data_table.select_count(from_ts = from_ts, till_ts = till_ts),
+      1,
+    )
+
+    rnd_amount = randint(2, 10)
+    ts0 = dt.now()
+    svc.create_data_records(
+      participant = p,
+      data_source_ids = [ds.id]*rnd_amount,
+      tss = [ts0 + td(seconds = x) for x in range(rnd_amount)],
+      vals = [1.0 if ds.is_categorical else 'abc' for _ in range(rnd_amount)],
+    )
+    wrappers.Connections.get(data_table.schema_name).commit()
+    self.assertEqual(
+      data_table.select_count(from_ts = from_ts, till_ts = till_ts),
+      rnd_amount + 1,
+    )

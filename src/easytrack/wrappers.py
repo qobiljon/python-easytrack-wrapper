@@ -47,10 +47,10 @@ class Connections:
 
   @staticmethod
   def closeAll(commit: bool = True):
-    for x in Connections.__connections:
-      if commit: Connections.__connections[x].commit()
-      Connections.__connections[x].close()
-      del Connections.__connections[x]
+    for k in list(Connections.__connections.keys()):
+      if commit: Connections.__connections[k].commit()
+      Connections.__connections[k].close()
+      del Connections.__connections[k]
 
 
 class BaseDataTableWrapper(ABC):
