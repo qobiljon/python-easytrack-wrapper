@@ -55,6 +55,7 @@ jobs:
       - name: Run unit tests
         run: |
           pipenv run coverage run --source='.' -m unittest src.easytrack.tests
+          pipenv run coverage report
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: easytrack
