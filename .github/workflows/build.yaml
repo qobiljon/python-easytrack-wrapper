@@ -11,7 +11,7 @@ on:
 jobs:
   Unittest:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
 
     services:
       db_service:
@@ -68,7 +68,7 @@ jobs:
 
   Pylint:
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
