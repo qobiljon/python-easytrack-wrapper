@@ -29,10 +29,9 @@ jobs:
           - 5432:5432 # Maps tcp port 5432 on service container to the host
 
     steps:
-      - name: Check out repository code
+      - name: Checkout
         uses: actions/checkout@v2
 
-      # Setup Python (faster than using Python container)
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
@@ -51,10 +50,11 @@ jobs:
         if: steps.cache-pipenv.outputs.cache-hit != 'true'
         run: |
           pipenv install --deploy --dev
+          pipenv install -d pylint --deploy --dev
 
-      - name: Unittest
+      - name: Run unit tests
         run: |
-          pipenv run test -svvv
+          pipenv run coverage run --source='.' -m unittest src.easytrack.tests
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: easytrack
@@ -64,4 +64,4 @@ jobs:
 
       - name: Pylint
         run: |
-          find . -name '*.py' -exec pylint {} \;
+          pipenv run pylint src
