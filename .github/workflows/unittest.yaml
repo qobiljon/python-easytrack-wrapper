@@ -1,4 +1,4 @@
-name: Python package
+name: Unit testing
 
 on:
   push:
@@ -9,9 +9,9 @@ on:
       - "main"
 
 jobs:
-  Unittest:
+  unittest:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     services:
       db_service:
