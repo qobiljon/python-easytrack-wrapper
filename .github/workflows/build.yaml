@@ -1,0 +1,99 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  Unittest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    services:
+      db_service:
+        image: postgres
+        env:
+          POSTGRES_USER: easytrack
+          POSTGRES_DB: easytrack_test
+          POSTGRES_PASSWORD: easytrack
+        options: >- # Set health checks to wait until postgres has started
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432 # Maps tcp port 5432 on service container to the host
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+
+      - name: Install pipenv
+        run: |
+          python -m pip install --upgrade pipenv wheel
+      - id: cache-pipenv
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/share/virtualenvs
+          key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-pipenv.outputs.cache-hit != 'true'
+        run: |
+          pipenv install --deploy --dev
+          pipenv install -d pylint --deploy --dev
+
+      - name: Run unit tests
+        run: |
+          pipenv run coverage run --source='.' -m unittest src.easytrack.tests
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: easytrack
+          POSTGRES_TEST_DBNAME: easytrack_test
+          POSTGRES_PASSWORD: easytrack
+          POSTGRES_PORT: 5432
+
+      - name: Pylint
+        run: |
+          pipenv run pylint src
+
+  Pylint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+
+      - name: Install pipenv
+        run: |
+          python -m pip install --upgrade pipenv wheel
+      - id: cache-pipenv
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/share/virtualenvs
+          key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-pipenv.outputs.cache-hit != 'true'
+        run: |
+          pipenv install --deploy --dev
+          pipenv install -d pylint --deploy --dev
+
+      - name: Pylint
+        run: |
+          pipenv run pylint src

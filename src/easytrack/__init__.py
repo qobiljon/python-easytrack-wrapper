@@ -1,29 +1,33 @@
-import psycopg2 as pg2
-import psycopg2.extras as pg2_extras
+'''Root package of the easytrack project.'''
+# pylint: disable=duplicate-code
 
 from .utils import notnull
 from . import models as mdl
-
-postgres_host: str = None
-postgres_port: int = None
-postgres_dbname: str = None
-postgres_user: str = None
-postgres_password: str = None
+from . import settings
 
 
 def init(db_host: str, db_port: int, db_name: str, db_user: str, db_password: str):
-  global postgres_host, postgres_port, postgres_dbname, postgres_user, postgres_password
+    """
+    Initialize the database connection.
+    :param db_host: The host of the database.
+    :param db_port: The port of the database.
+    :param db_name: The name of the database.
+    :param db_user: The user of the database.
+    :param db_password: The password of the database.
+    """
 
-  postgres_host = notnull(db_host)
-  postgres_port = notnull(db_port)
-  postgres_dbname = notnull(db_name)
-  postgres_user = notnull(db_user)
-  postgres_password = notnull(db_password)
+    # load dataset settings
+    settings.POSRGRES_HOST = notnull(db_host)
+    settings.POSTGRES_PORT = notnull(db_port)
+    settings.POSTGRES_DBNAME = notnull(db_name)
+    settings.POSTGRES_USER = notnull(db_user)
+    settings.POSTGRES_PASSWORD = notnull(db_password)
 
-  mdl.init(
-    host = postgres_host,
-    port = postgres_port,
-    dbname = postgres_dbname,
-    user = postgres_user,
-    password = postgres_password,
-  )
+    # initialize database connection
+    mdl.init(
+        host = settings.POSRGRES_HOST,
+        port = settings.POSTGRES_PORT,
+        dbname = settings.POSTGRES_DBNAME,
+        user = settings.POSTGRES_USER,
+        password = settings.POSTGRES_PASSWORD,
+    )
