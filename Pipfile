@@ -13,6 +13,7 @@ pytz = "*"
 twine = "*"
 
 [dev-packages]
+pylint = "*"
 twine = "*"
 yapf = "*"
 
