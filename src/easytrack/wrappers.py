@@ -64,7 +64,11 @@ class BaseDataTableWrapper(ABC):
 
     def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
         self.schema_name = 'data'
-        self.table_name = f'c{participant.campaign.id}u{participant.user.id}d{data_source.id}'
+        self.table_name = ''.join([
+            f'c{participant.campaign.id}',
+            f'u{participant.user.id}',
+            f'd{data_source.id}',
+        ])
         self.campaign_id = participant.campaign.id
         self.user_id = participant.user.id
         self.data_source_id = data_source.id
@@ -338,7 +342,12 @@ class AggDataTable(BaseDataTableWrapper):
 
     def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
         super().__init__(participant = participant, data_source = data_source)
-        self.table_name = f'c{participant.campaign.id}u{participant.user.id}d{data_source.id}_aggregated'
+        self.table_name = ''.join([
+            f'c{participant.campaign.id}',
+            f'u{participant.user.id}',
+            f'd{data_source.id}',
+            '_aggregated',
+        ])
 
 
 class DataSourceStats:

@@ -9,7 +9,7 @@ on:
       - "main"
 
 jobs:
-  unittest:
+  Unittest:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
