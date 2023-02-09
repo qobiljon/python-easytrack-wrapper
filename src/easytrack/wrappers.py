@@ -72,7 +72,7 @@ class BaseDataTableWrapper(ABC):
         self.campaign_id = participant.campaign.id
         self.user_id = participant.user.id
         self.data_source_id = data_source.id
-        self.is_categorical = data_source.is_categorical
+        self.configurations = data_source.configurations
 
     def create_table(self):
         """Creates a data table for a participant and data source if doesn't exist already"""
@@ -85,7 +85,7 @@ class BaseDataTableWrapper(ABC):
                 (
                   data_source_id int references core.data_source (id),
                   ts timestamp,
-                  val {"text" if self.is_categorical else "float"}
+                  val "text"
                 )
                 ''')
             cur.execute(f'''
@@ -144,7 +144,7 @@ class BaseDataTableWrapper(ABC):
                 ''', (
                     self.data_source_id,
                     strip_tz(timestamp),
-                    str(value) if self.is_categorical else float(value),
+                    str(value),
                 ))
         if commit:
             con.commit()

@@ -143,7 +143,7 @@ class BaseTestCase(TestCase):
         return svc.create_data_source(
             name = name,
             icon_name = 'dummy',
-            is_categorical = True,
+            configurations = {},
         )
 
 
@@ -266,7 +266,7 @@ class DataSourceTestCase(BaseTestCase):
             svc.create_data_source,
             name = None,
             icon_name = 'dummy',
-            is_categorical = False,
+            configurations = {},
         )
 
     def test_data_source_create_duplicate(self):
@@ -275,7 +275,7 @@ class DataSourceTestCase(BaseTestCase):
         data_source2 = svc.create_data_source(
             name = 'dummy',
             icon_name = 'dummy',
-            is_categorical = True,
+            configurations = {},
         )
         self.assertEqual(data_source1.id, data_source2.id)
 
@@ -286,7 +286,7 @@ class DataSourceTestCase(BaseTestCase):
         data_source = svc.create_data_source(
             name = 'dummy',
             icon_name = 'dummy',
-            is_categorical = False,
+            configurations = {},
         )
         self.assertIsInstance(data_source, mdl.DataSource)
         self.assertTrue(mdl.DataSource.filter(id = data_source.id).execute())
@@ -425,7 +425,7 @@ class DataTableTestCase(BaseTestCase):
             participant = participant,
             data_source = data_source,
             timestamp = datetime.now(),
-            value = 'value' if data_source.is_categorical else 1.0,
+            value = 'value',
         )
         self.assertEqual(
             slc.get_filtered_amount_of_data(
@@ -443,7 +443,7 @@ class DataTableTestCase(BaseTestCase):
             participant = participant,
             data_source_ids = [data_source.id]*random_amount,
             timestamps = [ts_now + x for x in range(random_amount)],
-            values = [1.0 if data_source.is_categorical else 'abc' for _ in range(random_amount)],
+            values = ['abc']*random_amount,
         )
         self.assertEqual(
             slc.get_filtered_amount_of_data(
@@ -483,11 +483,11 @@ class DataTableTestCase(BaseTestCase):
         self.assertIsNone(data.select_last_ts())
         data.insert(
             timestamp = now_ts,
-            value = 'value' if data_source.is_categorical else 1.0,
+            value = 'value',
         )
         data.insert(
             timestamp = now_ts + timedelta(seconds = 1),
-            value = 'value' if data_source.is_categorical else 1.0,
+            value = 'value',
         )
         self.assertEqual(
             data.select_count(

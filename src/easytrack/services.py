@@ -215,12 +215,12 @@ def delete_campaign(supervisor: mdl.Supervisor):
         campaign.delete_instance()
 
 
-def create_data_source(name: str, icon_name: str, is_categorical: bool) -> mdl.DataSource:
+def create_data_source(name: str, icon_name: str, configurations: dict) -> mdl.DataSource:
     """
     Creates a data source object in database and returns DataSource object
     :param name: name of the data source
     :param icon_name: name of the icon
-    :param is_categorical: whether the data source is categorical
+    :param configurations: configurations of the data source
     :return: DataSource object
     """
 
@@ -231,7 +231,7 @@ def create_data_source(name: str, icon_name: str, is_categorical: bool) -> mdl.D
     return mdl.DataSource.create(
         name = name,
         icon_name = notnull(icon_name),
-        is_categorical = notnull(is_categorical),
+        configurations = notnull(configurations),
     )
 
 

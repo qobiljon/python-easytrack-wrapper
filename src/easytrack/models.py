@@ -4,7 +4,7 @@
 from datetime import datetime
 from datetime import timedelta
 from peewee import AutoField, TextField, ForeignKeyField, TimestampField
-from peewee import BooleanField, Model, PostgresqlDatabase
+from peewee import Model, PostgresqlDatabase
 from playhouse.postgres_ext import BinaryJSONField
 
 import psycopg2 as pg2
@@ -85,7 +85,7 @@ class DataSource(Model):
     id = AutoField(primary_key = True, null = False)
     name = TextField(unique = True, null = False)
     icon_name = TextField(null = False)
-    is_categorical = BooleanField(null = False)
+    configurations = BinaryJSONField(null = False)
 
     class Meta:
         '''Meta class for the DataSource model.'''
