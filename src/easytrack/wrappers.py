@@ -210,11 +210,12 @@ class BaseDataTableWrapper(ABC):
             cur.execute(
                 f'''
                 select
-                  data_source_id, ts, val
+                  *
                 from
                   {self.schema_name}.{self.table_name}
                 where
-                  data_source_id = %s and ts >= %s limit %s
+                  data_source_id = %s and
+                  {BaseDataTableWrapper.TS_COL_NAME} >= %s limit %s
                 ''', (
                     self.data_source_id,
                     strip_tz(from_ts),
@@ -247,11 +248,13 @@ class BaseDataTableWrapper(ABC):
             cur.execute(
                 f'''
                 select
-                  data_source_id, ts, val
+                  *
                 from
                   {self.schema_name}.{self.table_name}
                 where
-                  data_source_id = %s and ts >= %s and ts < %s
+                  data_source_id = %s and
+                  {BaseDataTableWrapper.TS_COL_NAME} >= %s and
+                  {BaseDataTableWrapper.TS_COL_NAME} < %s
                 ''', (
                     self.data_source_id,
                     strip_tz(from_ts),
