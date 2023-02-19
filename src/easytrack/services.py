@@ -245,7 +245,7 @@ def create_column(
     :param name: name of the column
     :param type: type of the column (e.g. float, string)
     :param is_categorical: whether the column is categorical
-    :param accept_values: comma-separated list of accepted values (only applicable to categorical columns)
+    :param accept_values: comma-separated list of accepted values
     :return: Column object
     """
 

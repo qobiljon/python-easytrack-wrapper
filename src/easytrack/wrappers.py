@@ -181,7 +181,9 @@ class BaseDataTableWrapper(ABC):
             cur.execute(
                 f'''
                 insert into
-                  {self.schema_name}.{self.table_name}(data_source_id, {BaseDataTableWrapper.TS_COL_NAME}, {col_names_str})
+                  {self.schema_name}.{self.table_name}(
+                    data_source_id, {BaseDataTableWrapper.TS_COL_NAME}, {col_names_str}
+                  )
                 values
                   (%s, %s, {", ".join(["%s"] * len(columns_arr))})
                 ''', [self.data_source_id, strip_tz(timestamp)] + col_vals_args)
