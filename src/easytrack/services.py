@@ -102,9 +102,10 @@ def remove_supervisor_from_campaign(old_supervisor: mdl.Supervisor):
         old_supervisor.delete()
 
 
-def create_campaign(
+def create_campaign(   # pylint: disable=too-many-arguments
     owner: mdl.User,
     name: str,
+    description: Optional[str],
     start_ts: datetime,
     end_ts: datetime,
     data_sources: Optional[List[mdl.DataSource]],
@@ -132,6 +133,7 @@ def create_campaign(
     campaign = mdl.Campaign.create(
         owner = notnull(owner),
         name = notnull(name),
+        description = description,
         start_ts = start_ts,
         end_ts = end_ts,
     )

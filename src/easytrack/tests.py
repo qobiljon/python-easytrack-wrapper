@@ -113,6 +113,7 @@ class BaseTestCase(TestCase):
         return svc.create_campaign(
             owner = user,
             name = 'dummy',
+            description=None,
             start_ts = datetime.now(),
             end_ts = datetime.now() + timedelta(days = 1),
             data_sources = [],
@@ -201,6 +202,7 @@ class CampaignTestCase(BaseTestCase):
             svc.create_campaign,
             owner = owner_user,
             name = 'dummy',
+            description = None,
             start_ts = datetime.now() - timedelta(days = 1),
             end_ts = datetime.now() + timedelta(days = 1),
             data_sources = [],
@@ -213,6 +215,7 @@ class CampaignTestCase(BaseTestCase):
         campaign = svc.create_campaign(
             owner = owner_user,
             name = 'dummy',
+            description=None,
             start_ts = datetime.now(),
             end_ts = datetime.now() + timedelta(days = 1),
             data_sources = [],

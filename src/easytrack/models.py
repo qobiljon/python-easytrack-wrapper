@@ -72,6 +72,7 @@ class Campaign(Model):
     id = AutoField(primary_key = True, null = False)
     owner = ForeignKeyField(User, on_delete = 'CASCADE', null = False)
     name = TextField(null = False)
+    description = TextField(null = True)
     start_ts = TimestampField(default = datetime.now, null = False)
     end_ts = TimestampField(default = lambda: datetime.now() + timedelta(days = 90), null = False)
 
