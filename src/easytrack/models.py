@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from datetime import timedelta
-from peewee import AutoField, TextField, ForeignKeyField, TimestampField
+from peewee import AutoField, TextField, ForeignKeyField, TimestampField, BooleanField
 from peewee import Model, PostgresqlDatabase
 from playhouse.postgres_ext import BinaryJSONField
 
@@ -42,7 +42,9 @@ def init(host: str, port: str, dbname: str, user: str, password: str):
     pg_database.create_tables([
         User,
         Campaign,
+        Column,
         DataSource,
+        DataSourceColumn,
         CampaignDataSource,
         Supervisor,
         Participant,
@@ -84,13 +86,38 @@ class DataSource(Model):
     '''Data source model.'''
     id = AutoField(primary_key = True, null = False)
     name = TextField(unique = True, null = False)
-    icon_name = TextField(null = False)
-    configurations = BinaryJSONField(null = False)
 
     class Meta:
         '''Meta class for the DataSource model.'''
         database = pg_database
         db_table = 'data_source'
+        schema = 'core'
+
+
+class Column(Model):
+    '''Column model - a column in a data source (e.g. a column in a CSV file).'''
+    id = AutoField(primary_key = True, null = False)
+    name = TextField(null = False)
+    column_type = TextField(null = False)
+    is_categorical = BooleanField(null = False)
+    accept_values = TextField(null = True)
+
+    class Meta:
+        '''Meta class for the Column model.'''
+        database = pg_database
+        db_table = 'column'
+        schema = 'core'
+
+
+class DataSourceColumn(Model):
+    '''Data source model.'''
+    data_source = ForeignKeyField(DataSource, on_delete = 'CASCADE', null = False)
+    column = ForeignKeyField(Column, on_delete = 'CASCADE', null = False)
+
+    class Meta:
+        '''Meta class for the DataSourceColumn model.'''
+        database = pg_database
+        db_table = 'data_source_column'
         schema = 'core'
 
 

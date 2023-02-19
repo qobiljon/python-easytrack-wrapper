@@ -132,6 +132,18 @@ def find_data_source(data_source_id: int = None, name: str = None) -> Optional[m
     return None   # both data_source_id and name are None
 
 
+def get_data_source_columns(data_source: models.DataSource) -> List[models.Column]:
+    """
+    Returns list of a data source's columns
+    :param data_source: data source being queried
+    :return: list of data source's columns
+    """
+
+    # get data source columns from mdl.DataSourceColumns
+    tmp = models.DataSourceColumn.filter(data_source = notnull(data_source))
+    return [data_source_column.column for data_source_column in tmp]
+
+
 def get_all_data_sources() -> List[models.DataSource]:
     """
     List of all data sources in database

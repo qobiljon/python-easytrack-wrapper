@@ -10,7 +10,11 @@ from . import wrappers
 from .utils import notnull
 
 
-def create_user(email: str, name: str, session_key: str) -> mdl.User:
+def create_user(
+    email: str,
+    name: str,
+    session_key: str,
+) -> mdl.User:
     """
     Creates a user object in database and returns User object
     :param email: email of the user
@@ -26,7 +30,10 @@ def create_user(email: str, name: str, session_key: str) -> mdl.User:
     )
 
 
-def set_user_session_key(user: mdl.User, new_session_key: str):
+def set_user_session_key(
+    user: mdl.User,
+    new_session_key: str,
+):
     """
     Sets a new session key for a user
     :param user: user object to be modified
@@ -38,7 +45,10 @@ def set_user_session_key(user: mdl.User, new_session_key: str):
     user.save()
 
 
-def add_campaign_participant(campaign: mdl.Campaign, add_user: mdl.User) -> bool:
+def add_campaign_participant(
+    campaign: mdl.Campaign,
+    add_user: mdl.User,
+) -> bool:
     """
     Binds user with campaign, making a participant.
     :param add_user: User object to be bound to a campaign
@@ -60,7 +70,10 @@ def add_campaign_participant(campaign: mdl.Campaign, add_user: mdl.User) -> bool
     return True
 
 
-def add_supervisor_to_campaign(supervisor: mdl.Supervisor, new_user: mdl.User) -> bool:
+def add_supervisor_to_campaign(
+    supervisor: mdl.Supervisor,
+    new_user: mdl.User,
+) -> bool:
     """
     Binds user with campaign, making a supervisor.
     :param new_user: User object to be bound to a campaign
@@ -134,7 +147,10 @@ def create_campaign(
     return campaign
 
 
-def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource) -> bool:
+def add_campaign_data_source(
+    campaign: mdl.Campaign,
+    data_source: mdl.DataSource,
+) -> bool:
     """
     Adds a data source to campaign
     :param campaign: the campaign to add data source to
@@ -151,7 +167,10 @@ def add_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource
     return True
 
 
-def remove_campaign_data_source(campaign: mdl.Campaign, data_source: mdl.DataSource):
+def remove_campaign_data_source(
+    campaign: mdl.Campaign,
+    data_source: mdl.DataSource,
+):
     """
     Removes a data source from a campaign
     :param campaign: the campaign to remove data source from
@@ -215,24 +234,106 @@ def delete_campaign(supervisor: mdl.Supervisor):
         campaign.delete_instance()
 
 
-def create_data_source(name: str, icon_name: str, configurations: dict) -> mdl.DataSource:
+def create_column(
+    name: str,
+    column_type: str,
+    is_categorical: bool,
+    accept_values: Optional[str],
+) -> mdl.Column:
+    """
+    Creates a column object in database and returns Column object
+    :param name: name of the column
+    :param type: type of the column (e.g. float, string)
+    :param is_categorical: whether the column is categorical
+    :param accept_values: comma-separated list of accepted values (only applicable to categorical columns)
+    :return: Column object
+    """
+
+    # assert that name is not empty
+    if not name:
+        raise ValueError('Name cannot be empty!')
+
+    # type must be one of ['timestamp', 'text', 'integer', 'float']
+    valid_types = ['timestamp', 'text', 'integer', 'float']
+    if column_type not in valid_types:
+        raise ValueError(f'Invalid type value! Must be one of {valid_types}')
+
+    # text columns must be categorical
+    if is_categorical is None:
+        raise ValueError('is_categorical cannot be None!')
+    if column_type == 'text' and not is_categorical:
+        raise ValueError('text columns must be categorical!')
+
+    # comma-separated list of values must be appropriate for type (if accept_values is not None)
+    accept_values_str = None
+    if accept_values is not None:
+        accept_values_arr = map(str.strip, accept_values.split(','))
+        if column_type == 'integer':
+            for value in accept_values_arr:
+                try:
+                    int(value)
+                except ValueError as exc:
+                    raise ValueError(f'Invalid integer value: {value}') from exc
+        elif column_type == 'float':
+            for value in accept_values_arr:
+                try:
+                    float(value)
+                except ValueError as exc:
+                    raise ValueError(f'Invalid float value: {value}') from exc
+
+        accept_values_str = ','.join(accept_values_arr)
+
+    # create column
+    return mdl.Column.create(
+        name = name,
+        column_type = notnull(column_type),
+        is_categorical = notnull(is_categorical),
+        accept_values = accept_values_str,
+    )
+
+
+def create_data_source(
+    name: str,
+    columns: List[mdl.DataSourceColumn],
+) -> mdl.DataSource:
     """
     Creates a data source object in database and returns DataSource object
     :param name: name of the data source
-    :param icon_name: name of the icon
-    :param configurations: configurations of the data source
+    :param columns: list of columns of the data source
     :return: DataSource object
     """
 
+    # assert that name is not empty
+    if not name:
+        raise ValueError('Name cannot be empty!')
+
+    # assert that columns are not empty
+    if not columns:
+        raise ValueError('columns cannot be empty!')
+
+    # check if data source already exists
     data_source = mdl.DataSource.get_or_none(name = notnull(name))
     if data_source:
         return data_source
 
-    return mdl.DataSource.create(
-        name = name,
-        icon_name = notnull(icon_name),
-        configurations = notnull(configurations),
+    # create data source
+    data_source = mdl.DataSource.create(name = name)
+
+    # add timestamp (reserved) column
+    mdl.Column.create(
+        data_source = data_source,
+        name = wrappers.BaseDataTableWrapper.TS_COL_NAME,
+        column_type = 'timestamp',
+        is_categorical = False,
     )
+
+    # add other columns to data source
+    for column in columns:
+        if column.name == wrappers.BaseDataTableWrapper.TS_COL_NAME:
+            continue   # skip reserved timestamp column
+        mdl.DataSourceColumn.create(data_source = data_source, column = column)
+
+    return data_source
 
 
 def create_data_record(
@@ -286,7 +387,10 @@ def create_data_records(
         )
 
 
-def dump_data(participant: mdl.Participant, data_source: Optional[mdl.DataSource]) -> str:
+def dump_data(
+    participant: mdl.Participant,
+    data_source: Optional[mdl.DataSource],
+) -> str:
     """
     Dumps data of a participant to a file
     :param participant: participant of a campaign

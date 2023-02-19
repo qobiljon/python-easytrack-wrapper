@@ -12,6 +12,7 @@ import psycopg2.extras as pg2_extras
 import psycopg2 as pg2
 
 from . import models as mdl
+from . import selectors as slc
 from .utils import notnull, get_temp_filepath, strip_tz
 from . import settings
 
@@ -62,7 +63,11 @@ class Connections:
 class BaseDataTableWrapper(ABC):
     '''Base data table wrapper'''
 
+    # timestamp name constant
+    TS_COL_NAME = 'ts'
+
     def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
+        # table details
         self.schema_name = 'data'
         self.table_name = ''.join([
             f'c{participant.campaign.id}',
@@ -72,28 +77,43 @@ class BaseDataTableWrapper(ABC):
         self.campaign_id = participant.campaign.id
         self.user_id = participant.user.id
         self.data_source_id = data_source.id
-        self.configurations = data_source.configurations
 
     def create_table(self):
         """Creates a data table for a participant and data source if doesn't exist already"""
 
         con = Connections.get(schema_name = self.schema_name)
         with con.cursor() as cur:
+
+            # get columns and make sql statement (i.e. names and types of columns)
+            columns = slc.get_data_source_columns(self.data_source_id)
+            column_type_replacements = {
+                'timestamp': 'timestamp',
+                'text': 'text',
+                'integer': 'integer',
+                'float': 'float8',
+            }
+            tmp = []
+            for column in columns:
+                if column.name == BaseDataTableWrapper.TS_COL_NAME:
+                    continue   # reserved column name
+                tmp.append(f'{column.name} {column_type_replacements[column.column_type]}')
+            columns_sql = ', '.join(tmp)
+
+            # create table with columns
             cur.execute(f'''
-                create table if not exists
-                  {self.schema_name}.{self.table_name}
-                (
-                  data_source_id int references core.data_source (id),
-                  ts timestamp,
-                  val "text"
+                create table if not exists {self.schema_name}.{self.table_name} (
+                    data_source_id int references core.data_source (id),
+                    {BaseDataTableWrapper.TS_COL_NAME} timestamp without time zone NOT NULL DEFAULT (
+                        current_timestamp AT TIME ZONE 'UTC'
+                    ),
+                    {columns_sql}
                 )
-                ''')
+            ''')
             cur.execute(f'''
-                create index if not exists
-                  idx_{self.table_name}_ts
-                on
-                  {self.schema_name}.{self.table_name} (ts)
-                ''')
+                create index if not exists idx_{self.table_name}_{BaseDataTableWrapper.TS_COL_NAME}
+                on {self.schema_name}.{self.table_name} ({BaseDataTableWrapper.TS_COL_NAME})
+            ''')
+
         con.commit()
 
     def drop_table(self):
@@ -123,29 +143,48 @@ class BaseDataTableWrapper(ABC):
 
         return ans
 
-    def insert(self, timestamp: datetime, value: Union[float, str], commit: bool = True):
+    def insert(
+        self,
+        timestamp: datetime,
+        value: Dict[str, Union[datetime, str, int, float]],
+        commit: bool = True,
+    ):
         """
-        Creates a data record in raw data table (e.g. sensor reading)
-        :param participant: participant of a campaign
-        :param data_source: data source of the data record
-        :param ts: timestamp
-        :param val: value
-        :return: None
+        Inserts a data record into a data table for a participant and data source
+        :param timestamp: timestamp of the data record
+        :param value: value of the data record
+        :param commit: whether to commit the changes to database
         """
 
+        # get columns for validating data and making sql query
+        columns_arr = []   # NOTE: columns sequence must be preserved (dynamic schema management)
+        column_py_types = {'timestamp': datetime, 'text': str, 'integer': int, 'float': float}
+        for column in slc.get_data_source_columns(self.data_source_id):
+            if column.name == BaseDataTableWrapper.TS_COL_NAME:
+                continue   # reserved column (added automatically)
+            columns_arr.append((column.name, column_py_types[column.column_type]))
+
+        # make sql params (columns and args)
+        col_names_str = ', '.join([colname for colname, _ in columns_arr])
+        col_vals_args = [value[colname] for colname, _ in columns_arr]
+
+        # assert that all columns are present in value and types are correct
+        for colname, expected_type in columns_arr:
+            if colname not in value:
+                raise ValueError(f'Column {colname} is missing in value')
+            if not isinstance(value[colname], expected_type):
+                raise ValueError(f'Column {colname} has incorrect type')
+
+        # insert data record
         con = Connections.get(self.schema_name)
         with con.cursor() as cur:
             cur.execute(
                 f'''
                 insert into
-                  {self.schema_name}.{self.table_name}(data_source_id, ts, val)
+                  {self.schema_name}.{self.table_name}(data_source_id, {BaseDataTableWrapper.TS_COL_NAME}, {col_names_str})
                 values
-                  (%s,%s,%s)
-                ''', (
-                    self.data_source_id,
-                    strip_tz(timestamp),
-                    str(value),
-                ))
+                  (%s, %s, {", ".join(["%s"] * len(columns_arr))})
+                ''', [self.data_source_id, strip_tz(timestamp)] + col_vals_args)
         if commit:
             con.commit()
 
