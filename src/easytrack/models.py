@@ -174,7 +174,7 @@ class HourlyStats(Model):
     '''Hourly stats model.'''
     participant = ForeignKeyField(Participant, on_delete = 'CASCADE', null = False)
     data_source = ForeignKeyField(DataSource, on_delete = 'CASCADE', null = False)
-    ts = TimestampField(null = False)
+    timestamp = TimestampField(null = False)
     amount = BinaryJSONField(null = False, default = {})
 
     class Meta:
@@ -184,6 +184,8 @@ class HourlyStats(Model):
         schema = 'core'
 
         indexes = (
-            (('participant', 'data_source'), False),   # selection by participant and/or data source
-            (('ts',), False),   # selection by timestamp
+        # for fast selection of all stats by a participant and data source
+            (('participant', 'data_source'), False),
+        # for fast selection of all stats by timestamp
+            (('timestamp',), False),
         )

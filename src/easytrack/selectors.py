@@ -185,7 +185,7 @@ def get_filtered_amount_of_data(
     current: models.HourlyStats = models.HourlyStats.get_or_none(
         participant = notnull(participant),
         data_source = notnull(data_source),
-        ts = till_ts.replace(
+        timestamp = till_ts.replace(
             minute = 0,
             second = 0,
             microsecond = 0,
@@ -195,7 +195,7 @@ def get_filtered_amount_of_data(
         current: models.HourlyStats = models.HourlyStats.filter(
             participant = notnull(participant),
             data_source = notnull(data_source),
-        ).order_by(models.HourlyStats.ts.desc()).limit(1)
+        ).order_by(models.HourlyStats.timestamp.desc()).limit(1)
 
         if not current.exists():
             return 0
@@ -204,7 +204,7 @@ def get_filtered_amount_of_data(
     back_then: models.HourlyStats = models.HourlyStats.filter(
         participant = notnull(participant),
         data_source = notnull(data_source),
-        ts = from_ts.replace(
+        timestamp = from_ts.replace(
             minute = 0,
             second = 0,
             microsecond = 0,

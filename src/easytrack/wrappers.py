@@ -438,43 +438,59 @@ class ParticipantStats:
         self.amount_of_data: int = 0
         self.last_sync_ts: datetime = datetime.fromtimestamp(0)
 
+        # get all data sources for this participant
         data_sources: List[mdl.DataSource] = []
-        for campaign_data_source in mdl.CampaignDataSource.filter(campaign = participant.campaign):
+        tmp = mdl.CampaignDataSource.filter(campaign = participant.campaign)
+        for campaign_data_source in tmp:
             data_sources.append(campaign_data_source.data_source)
 
+        # get stats for each data source
         for data_source in sorted(data_sources, key = lambda x: x.name):
-            prev_stats: Optional[mdl.HourlyStats] = mdl.HourlyStats.filter(
+
+            # get last sync time
+            query = mdl.HourlyStats.filter(
                 participant = participant,
-                data_source = data_source).order_by(mdl.HourlyStats.ts.desc(),).limit(1)
+                data_source = data_source,
+            ).order_by(mdl.HourlyStats.timestamp.desc()).limit(1)
+            prev_stats: Optional[mdl.HourlyStats] = next(iter(query), None)
 
             if prev_stats:
-                prev_stats = list(prev_stats)[0]
+                # get amount of samples
+                amount = sum(prev_stats.amount[k] for k in prev_stats.amount)
+                self.stats[data_source] = DataSourceStats(
+                    data_source = data_source,
+                    amount_of_samples = amount,
+                    last_sync_time = prev_stats.timestamp,
+                )
+            else:
+                # no stats for this data source
+                self.stats[data_source] = DataSourceStats(data_source = data_source)
 
-            self.stats[data_source] = DataSourceStats(
-                data_source = data_source,
-                amount_of_samples = sum(prev_stats.amount[k] for k in prev_stats.amount),
-                last_sync_time = prev_stats.ts) if prev_stats else DataSourceStats(
-                    data_source = data_source)
-
+            # update total amount of data and last sync time
             self.amount_of_data += self.stats[data_source].amount_of_samples
             self.last_sync_ts = max(
                 self.last_sync_ts,
                 self.stats[data_source].last_sync_time,
             )
 
-        then = self.participant.join_ts.replace(
+        # time when participant joined the campaign (rounded to the next day)
+        joined_timestamp = self.participant.join_ts.replace(
             hour = 0,
             minute = 0,
             second = 0,
             microsecond = 0,
         ) + timedelta(days = 1)
-        now = datetime.now().replace(
+
+        # current time (rounded to the next day)
+        current_timestamp = datetime.now().replace(
             hour = 0,
             minute = 0,
             second = 0,
             microsecond = 0,
         ) + timedelta(days = 1)
-        self.participation_duration: int = (now - then).days
+
+        # calculate participation duration
+        self.participation_duration: int = (joined_timestamp - current_timestamp).days
 
     def __getitem__(self, data_source: mdl.DataSource) -> DataSourceStats:
         if data_source in self.stats:
