@@ -342,7 +342,7 @@ def create_data_record(
     participant: mdl.Participant,
     data_source: mdl.DataSource,
     timestamp: datetime,
-    value: Union[float, str],
+    value: Dict[str, Union[datetime, str, int, float]],
 ):
     """
     Creates a data record in raw data table (e.g. sensor reading)
@@ -363,7 +363,7 @@ def create_data_records(
     participant: mdl.Participant,
     data_source_ids: List[int],
     timestamps: List[datetime],
-    values: List[Union[float, str]],
+    values: List[Dict[str, Union[datetime, str, int, float]]],
 ):
     """
     Creates a list of data records in raw data table (e.g. sensor reading)
@@ -376,11 +376,19 @@ def create_data_records(
 
     data_sources: Dict[int, mdl.DataSource] = {}   # dict()
     for timestamp, data_source_id, value in zip(timestamps, data_source_ids, values):
+
+        # get data source from cache or database
         if data_source_id not in data_sources:
+
+            # get data source from database
             db_data_source = slc.find_data_source(data_source_id = data_source_id, name = None)
             if db_data_source is None:
-                continue
+                continue   # skip data record if data source does not exist
+
+            # add data source to cache
             data_sources[data_source_id] = db_data_source
+
+        # create data record
         create_data_record(
             participant = participant,
             data_source = data_sources[data_source_id],

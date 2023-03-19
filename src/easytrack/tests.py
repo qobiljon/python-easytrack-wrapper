@@ -1,7 +1,7 @@
 """Unit tests for easytrack package."""
 # pylint: disable=no-value-for-parameter
 
-from unittest import TestCase, skip
+from unittest import TestCase
 from datetime import datetime
 from datetime import timedelta
 from random import randint
@@ -113,7 +113,7 @@ class BaseTestCase(TestCase):
         return svc.create_campaign(
             owner = user,
             name = 'dummy',
-            description=None,
+            description = None,
             start_ts = datetime.now(),
             end_ts = datetime.now() + timedelta(days = 1),
             data_sources = [],
@@ -144,12 +144,6 @@ class BaseTestCase(TestCase):
         return svc.create_data_source(
             name = name,
             columns = [
-                mdl.Column.create(
-                    name = 'timestamp',
-                    column_type = 'timestamp',
-                    is_categorical = False,
-                    accept_values = None,
-                ),
                 mdl.Column.create(
                     name = 'value',
                     column_type = 'float',
@@ -215,7 +209,7 @@ class CampaignTestCase(BaseTestCase):
         campaign = svc.create_campaign(
             owner = owner_user,
             name = 'dummy',
-            description=None,
+            description = None,
             start_ts = datetime.now(),
             end_ts = datetime.now() + timedelta(days = 1),
             data_sources = [],
@@ -644,20 +638,29 @@ class DataTableTestCase(BaseTestCase):
 
         self.cleanup()
 
-    @skip("amount is computed by background service in latest versions")
+    #@skip("amount is computed by background service in latest versions")
     def test_amount(self):
         '''Test that the amount of data is correctly computed.'''
+
+        # create campaign
         campaign = self.new_campaign(user = self.new_user('creator'))
 
+        # add data source to campaign
         data_source = self.new_data_source('dummy')
         svc.add_campaign_data_source(campaign = campaign, data_source = data_source)
-        self.assertTrue(slc.is_campaign_data_source(campaign = campaign, data_source = data_source))
+        added = slc.is_campaign_data_source(campaign = campaign, data_source = data_source)
+        self.assertTrue(added)   # check that data source was added
 
+        # add participant to campaign
         user = self.new_user('participant')
-        self.assertTrue(svc.add_campaign_participant(campaign = campaign, add_user = user))
-        participant = slc.get_participant(campaign = campaign, user = user)
-        self.assertIsNotNone(participant)
+        added = svc.add_campaign_participant(campaign = campaign, add_user = user)
+        self.assertTrue(added)   # user is added to campaign as participant
 
+        # get participant
+        participant = slc.get_participant(campaign = campaign, user = user)
+        self.assertIsNotNone(participant)   # check that participant was added
+
+        # verify that there is no data (yet)
         now_ts = datetime.now()
         from_ts = now_ts.replace(year = now_ts.year - 1)
         till_ts = now_ts.replace(year = now_ts.year + 1)
@@ -670,34 +673,39 @@ class DataTableTestCase(BaseTestCase):
             ),
             0,
         )
+
+        # add data
         svc.create_data_record(
             participant = participant,
             data_source = data_source,
-            timestamp = datetime.now(),
-            value = 'value',
+            timestamp = now_ts,
+            value = {'value': 1.5},
         )
+
+        # verify amount of data
         self.assertEqual(
-            slc.get_filtered_amount_of_data(
-                participant = participant,
-                data_source = data_source,
+            wrappers.DataTable(participant = participant, data_source = data_source).select_count(
                 from_ts = from_ts,
                 till_ts = till_ts,
             ),
             1,
         )
 
+        # add more data (random amount)
         random_amount = randint(2, 10)
         ts_now = datetime.now()
         svc.create_data_records(
             participant = participant,
             data_source_ids = [data_source.id]*random_amount,
-            timestamps = [ts_now + x for x in range(random_amount)],
-            values = ['abc']*random_amount,
+            timestamps = [ts_now + timedelta(seconds = x) for x in range(random_amount)],
+            values = [{
+                'value': 1.5
+            }]*random_amount,
         )
+
+        # verify amount of data
         self.assertEqual(
-            slc.get_filtered_amount_of_data(
-                participant = participant,
-                data_source = data_source,
+            wrappers.DataTable(participant = participant, data_source = data_source).select_count(
                 from_ts = from_ts,
                 till_ts = till_ts,
             ),

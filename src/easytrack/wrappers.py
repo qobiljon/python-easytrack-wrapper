@@ -77,6 +77,7 @@ class BaseDataTableWrapper(ABC):
         self.campaign_id = participant.campaign.id
         self.user_id = participant.user.id
         self.data_source_id = data_source.id
+        self.data_source_columns = slc.get_data_source_columns(data_source = data_source.id)
 
     def create_table(self):
         """Creates a data table for a participant and data source if doesn't exist already"""
@@ -156,12 +157,24 @@ class BaseDataTableWrapper(ABC):
         :param commit: whether to commit the changes to database
         """
 
+        # assert that `value` is a dictionary
+        if not isinstance(value, dict):
+            raise ValueError('value must be a dictionary!')
+
         # get columns for validating data and making sql query
         columns_arr = []   # NOTE: columns sequence must be preserved (dynamic schema management)
         column_py_types = {'timestamp': datetime, 'text': str, 'integer': int, 'float': float}
-        for column in slc.get_data_source_columns(self.data_source_id):
+        for column in self.data_source_columns:
+
+            # skip reserved column
             if column.name == BaseDataTableWrapper.TS_COL_NAME:
                 continue   # reserved column (added automatically)
+
+            # verify that `value` contains all columns of `data_source`
+            if column.name not in value:
+                raise ValueError(f'Column {column.name} is missing from value!')
+
+            # add column to columns_arr
             columns_arr.append((column.name, column_py_types[column.column_type]))
 
         # make sql params (columns and args)
