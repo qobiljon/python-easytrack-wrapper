@@ -1,6 +1,6 @@
 '''This module contains functions for selecting data from the database.'''
 
-from typing import List, Optional
+from typing import List, Dict, Optional
 from datetime import datetime
 
 from . import models
@@ -167,54 +167,57 @@ def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSour
         ))
 
 
-def get_filtered_amount_of_data(
+def get_hourly_amount_of_data(
     participant: models.Participant,
     data_source: models.DataSource,
-    from_ts: datetime,
-    till_ts: datetime,
-) -> int:
+    hour_timestamp: datetime,
+) -> Dict[models.Column, int]:
     """
     Computes and returns the amount of data during specified period
     :param participant: participant being queried
     :param data_source: data source being queried
-    :param from_ts: start of the search range
-    :param till_ts: end of the search range
-    :return: amount of samples in the range with specified filters
+    :param hour_timestamp: timestamp of the hour being queried
+    :return: dictionary with the amount of data for each column
     """
 
-    current: models.HourlyStats = models.HourlyStats.get_or_none(
-        participant = notnull(participant),
-        data_source = notnull(data_source),
-        timestamp = till_ts.replace(
-            minute = 0,
-            second = 0,
-            microsecond = 0,
-        ),
-    )
-    if not current:
-        current: models.HourlyStats = models.HourlyStats.filter(
-            participant = notnull(participant),
-            data_source = notnull(data_source),
-        ).order_by(models.HourlyStats.timestamp.desc()).limit(1)
+    # prepare the dictionary with the amount of data for each column
+    columns = get_data_source_columns(data_source = data_source)
+    ans = {column: 0 for column in columns}
 
-        if not current.exists():
-            return 0
-        current = list(current)[0]
+    # get hourly stats for the specified hour (if exists)
+    tmp = models.HourlyStats.filter(
+        participant = participant,
+        data_source = data_source,
+        timestamp = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0),
+    ).execute()
+    tmp = next(iter(tmp), None)
 
-    back_then: models.HourlyStats = models.HourlyStats.filter(
-        participant = notnull(participant),
-        data_source = notnull(data_source),
-        timestamp = from_ts.replace(
-            minute = 0,
-            second = 0,
-            microsecond = 0,
-        ),
-    )
-    if not back_then.exists():
-        return 0
-    back_then = list(back_then)[0]
+    # if hourly stats don't exist for the hour
+    # try to get the latest stats before the hour
+    if not tmp:
+        # get the latest stats before the hour
+        tmp = models.HourlyStats.filter(
+            participant = participant,
+            data_source = data_source,
+            timestamp__lte = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0),
+        ).order_by(models.HourlyStats.timestamp.desc()).limit(1).execute()
+        tmp = next(iter(tmp), None)
 
-    return current.amount - back_then.amount
+    # if hourly stats exist (either for the hour or before the hour)
+    if tmp:
+        # json stores column ids as strings (not integers)
+        # so we need to convert them back for lookup
+        amounts = {int(k): v for k, v in tmp.amount.items()}
+
+        # update ans
+        for column in columns:
+            if column.id not in amounts:
+                # new value for column was added after the stats were computed (categorical column)
+                continue
+            ans[column] = amounts[column.id]
+
+    # return the amount of data for each column
+    return ans
 
 
 def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataSource):

@@ -665,9 +665,7 @@ class DataTableTestCase(BaseTestCase):
         from_ts = now_ts.replace(year = now_ts.year - 1)
         till_ts = now_ts.replace(year = now_ts.year + 1)
         self.assertEqual(
-            slc.get_filtered_amount_of_data(
-                participant = participant,
-                data_source = data_source,
+            wrappers.DataTable(participant = participant, data_source = data_source).select_count(
                 from_ts = from_ts,
                 till_ts = till_ts,
             ),
@@ -765,3 +763,117 @@ class DataTableTestCase(BaseTestCase):
         self.assertIsNotNone(last_ts)
         self.assertGreater(last_ts, first_ts)
         self.assertEqual(last_ts - first_ts, timedelta(seconds = 1))
+
+
+class HourlyStatsTestcase(BaseTestCase):
+    '''Unit tests for the hourly stats table.'''
+
+    def test_hourly_stats_now(self):
+        ''' Test that the hourly stats table is correctly updated. '''
+
+        # create campaign, data source, and participant
+        campaign = self.new_campaign(user = self.new_user('creator'))
+        data_source = self.new_data_source('dummy')
+        svc.add_campaign_data_source(campaign = campaign, data_source = data_source)
+        user = self.new_user('participant')
+        svc.add_campaign_participant(campaign = campaign, add_user = user)
+        participant = slc.get_participant(campaign = campaign, user = user)
+        columns = slc.get_data_source_columns(data_source = data_source)
+
+        # verify that there is no data (yet)
+        now_ts = datetime.now()
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = now_ts,
+        )
+        self.assertTrue(all(tmp[column] == 0 for column in columns))
+
+        # update hourly stats table (add one data point)
+        mdl.HourlyStats.insert(
+            participant = participant,
+            data_source = data_source,
+            timestamp = now_ts.replace(minute = 0, second = 0, microsecond = 0),
+            amount = {column.id: 1 for column in columns},
+        ).execute()
+
+        # verify amount of data with get_filtered_amount_of_data
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = now_ts,
+        )
+        self.assertTrue(all(tmp[column] == 1 for column in columns))
+
+    def test_hourly_stats_edges(self):
+        ''' Test that the hourly stats table is correctly updated. '''
+
+        # create campaign, data source, and participant
+        campaign = self.new_campaign(user = self.new_user('creator'))
+        data_source = self.new_data_source('dummy')
+        svc.add_campaign_data_source(campaign = campaign, data_source = data_source)
+        user = self.new_user('participant')
+        svc.add_campaign_participant(campaign = campaign, add_user = user)
+        participant = slc.get_participant(campaign = campaign, user = user)
+        columns = slc.get_data_source_columns(data_source = data_source)
+
+        # prepare edge case timestamps
+        tmp = datetime.now().replace(minute = 0, second = 0, microsecond = 0)
+        time0 = tmp - timedelta(days = 1)   # yesterday this time
+        time0_amount = 1
+        time1 = time0 + timedelta(hours = 1)   # yesterday this time + 1 hour (later)
+        time1_amount = 2
+
+        # add amounts at time0, and time1
+        mdl.HourlyStats.insert(
+            participant = participant,
+            data_source = data_source,
+            timestamp = time0,
+            amount = {column.id: time0_amount for column in columns},
+        ).execute()
+        mdl.HourlyStats.insert(
+            participant = participant,
+            data_source = data_source,
+            timestamp = time1,
+            amount = {column.id: time1_amount for column in columns},
+        ).execute()
+
+        # verify before time0
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = time0 - timedelta(seconds = 1),
+        )
+        self.assertTrue(all(tmp[column] == 0 for column in columns))
+
+        # verify at time0
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = time0,
+        )
+        self.assertTrue(all(tmp[column] == time0_amount for column in columns))
+
+        # verify between time0 and time1
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = time0 + timedelta(seconds = 1),
+        )
+        self.assertTrue(all(tmp[column] == time0_amount for column in columns))
+
+        # verify at time1
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = time1,
+        )
+        self.assertTrue(all(tmp[column] == time1_amount for column in columns))
+
+        # verify after time1
+        tmp = slc.get_hourly_amount_of_data(
+            participant = participant,
+            data_source = data_source,
+            hour_timestamp = time1 + timedelta(seconds = 1),
+        )
+        self.assertTrue(all(tmp[column] == time1_amount for column in columns))
