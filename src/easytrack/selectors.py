@@ -1,10 +1,13 @@
 '''This module contains functions for selecting data from the database.'''
 
+# stdlib
 from typing import List, Dict, Optional
 from datetime import datetime
 
+# local
 from . import models
 from .utils import notnull
+from .settings import ColumnTypes
 
 
 def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
@@ -181,40 +184,73 @@ def get_hourly_amount_of_data(
     """
 
     # prepare the dictionary with the amount of data for each column
-    columns = get_data_source_columns(data_source = data_source)
-    ans = {column: 0 for column in columns}
+    data_source_columns = get_data_source_columns(data_source = data_source)
+    ans: Dict[models.Column, Dict[str, int]] = {}
+    for data_source_column in data_source_columns:
+
+        # skip timestamp column
+        if data_source_column.name == ColumnTypes.TIMESTAMP.name:
+            continue
+
+        # initialize the dictionary for the column
+        ans[data_source_column] = {}
+
+        # if column has constraints, accept them as defaults
+        # (initial count = 0 for default values)
+        if data_source_column.accept_values:
+            # parse the accepted values
+            values = data_source_column.accept_values.split(",")
+
+            # add the accepted values to the dictionary
+            for value in values:
+                ans[data_source_column][value] = 0
+        else:
+            # if no constraint specified, set `amount` to 0
+            ans[data_source_column]["amount"] = 0
 
     # get hourly stats for the specified hour (if exists)
-    tmp = models.HourlyStats.filter(
+    stats = models.HourlyStats.filter(
         participant = participant,
         data_source = data_source,
         timestamp = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0),
     ).execute()
-    tmp = next(iter(tmp), None)
+    stats = next(iter(stats), None)
 
     # if hourly stats don't exist for the hour
     # try to get the latest stats before the hour
-    if not tmp:
+    if not stats:
         # get the latest stats before the hour
-        tmp = models.HourlyStats.filter(
+        stats = models.HourlyStats.filter(
             participant = participant,
             data_source = data_source,
             timestamp__lte = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0),
         ).order_by(models.HourlyStats.timestamp.desc()).limit(1).execute()
-        tmp = next(iter(tmp), None)
+        stats = next(iter(stats), None)
 
     # if hourly stats exist (either for the hour or before the hour)
-    if tmp:
-        # json stores column ids as strings (not integers)
-        # so we need to convert them back for lookup
-        amounts = {int(k): v for k, v in tmp.amount.items()}
+    if stats:
+        # no-op: for linting purposes only
+        stats: models.HourlyStats = stats
 
-        # update ans
-        for column in columns:
-            if column.id not in amounts:
-                # new value for column was added after the stats were computed (categorical column)
+        # json stores column ids as strings (not integers)
+        # so we need to convert them back for lookup by column id (int)
+        amounts = {int(k): v for k, v in dict(stats.amount).items()}
+
+        # update the dictionary with the amount of data for each column
+        for data_source_column in data_source_columns:
+
+            # skip timestamp column (no need to update it)
+            if data_source_column.name == ColumnTypes.TIMESTAMP.name:
                 continue
-            ans[column] = amounts[column.id]
+
+            # if column is not in the stats, skip it
+            if data_source_column.id not in amounts:
+                # new value for column was added after the stats were computed
+                # (categorical column)
+                continue
+
+            # if column has constraints, update the dictionary
+            ans[data_source_column] = amounts[data_source_column.id]
 
     # return the amount of data for each column
     return ans

@@ -1,7 +1,8 @@
 '''Wrappers for data tables and data records'''
 # pylint: disable=too-few-public-methods
 
-from typing import Any, Dict, List, Optional, OrderedDict, Union
+from typing import Any, Dict, List, Optional
+from typing import OrderedDict, Union
 from datetime import timedelta
 from datetime import datetime
 from abc import ABC
@@ -15,6 +16,7 @@ from . import models as mdl
 from . import selectors as slc
 from .utils import notnull, get_temp_filepath, strip_tz
 from . import settings
+from .settings import ColumnTypes
 
 
 class DataRecord:
@@ -63,10 +65,19 @@ class Connections:
 class BaseDataTableWrapper(ABC):
     '''Base data table wrapper'''
 
-    # timestamp name constant
-    TS_COL_NAME = 'ts'
+    def __init__(
+        self,
+        participant: mdl.Participant,
+        data_source: mdl.DataSource,
+    ):
+        """
+        [Constructor] Note that instances must be refreshed upon modification of
+        data source columns in database because the data table is created with
+        the columns of the data source at the time of creation.
+        :param `participant`: participant
+        :param `data_source`: data source
+        """
 
-    def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
         # table details
         self.schema_name = 'data'
         self.table_name = ''.join([
@@ -77,61 +88,79 @@ class BaseDataTableWrapper(ABC):
         self.campaign_id = participant.campaign.id
         self.user_id = participant.user.id
         self.data_source_id = data_source.id
-        self.data_source_columns = slc.get_data_source_columns(data_source = data_source.id)
+        self.columns = slc.get_data_source_columns(data_source = data_source.id)
 
     def create_table(self):
         """Creates a data table for a participant and data source if doesn't exist already"""
 
+        # prepare array of column names and types
+        tmp = []
+        coltype_map = ColumnTypes.to_map()
+        for column in self.columns:
+
+            # skip `timestamp` as it is added separately later
+            if column.name == ColumnTypes.TIMESTAMP.name:
+                continue   # reserved column name
+
+            # add column name and postgres type to array
+            tmp.append(f'{column.name} {coltype_map[column.column_type].pg_type}')
+
+        # merge columns part of sql query into a single string
+        columns_sql = ', '.join(tmp)
+
+        # create table and index with psycopg2
         con = Connections.get(schema_name = self.schema_name)
         with con.cursor() as cur:
 
-            # get columns and make sql statement (i.e. names and types of columns)
-            columns = slc.get_data_source_columns(self.data_source_id)
-            column_type_replacements = {
-                'timestamp': 'timestamp',
-                'text': 'text',
-                'integer': 'integer',
-                'float': 'float8',
-            }
-            tmp = []
-            for column in columns:
-                if column.name == BaseDataTableWrapper.TS_COL_NAME:
-                    continue   # reserved column name
-                tmp.append(f'{column.name} {column_type_replacements[column.column_type]}')
-            columns_sql = ', '.join(tmp)
-
-            # create table with columns
-            cur.execute(f'''
+            # create table with specified columns
+            # (NOTE: this is dynamic table creation i.e. name and columns are not fixed)
+            sql = cur.mogrify(f'''
                 create table if not exists {self.schema_name}.{self.table_name} (
-                    data_source_id int references core.data_source (id),
-                    {BaseDataTableWrapper.TS_COL_NAME} timestamp without time zone NOT NULL DEFAULT (
-                        current_timestamp AT TIME ZONE 'UTC'
-                    ),
+                        data_source_id int references core.data_source (id),
+                        {ColumnTypes.TIMESTAMP.name} timestamp without time zone NOT NULL DEFAULT (
+                            current_timestamp AT TIME ZONE 'UTC'
+                        ),
                     {columns_sql}
                 )
             ''')
-            cur.execute(f'''
-                create index if not exists idx_{self.table_name}_{BaseDataTableWrapper.TS_COL_NAME}
-                on {self.schema_name}.{self.table_name} ({BaseDataTableWrapper.TS_COL_NAME})
+            cur.execute(sql)
+
+            # create index on timestamp (for fast lookup)
+            sql = cur.mogrify(f'''
+                create index if not exists idx_{self.table_name}_{ColumnTypes.TIMESTAMP.name}
+                on {self.schema_name}.{self.table_name} ({ColumnTypes.TIMESTAMP.name})
             ''')
+            cur.execute(sql)
 
         con.commit()
 
     def drop_table(self):
         """Drops a data table for a participant and data source if exist already"""
 
+        # drop table and index with psycopg2
         con = Connections.get(schema_name = self.schema_name)
         with con.cursor() as cur:
-            cur.execute(f'drop table if exists {self.schema_name}.{self.table_name}')
-            cur.execute(f'drop index if exists idx_{self.table_name}_ts')
+
+            # drop table by executing sql query
+            sql = f'drop table if exists {self.schema_name}.{self.table_name}'
+            cur.execute(sql)
+
+            # drop index by executing sql query
+            sql = f'drop index if exists idx_{self.table_name}_{ColumnTypes.TIMESTAMP.name}'
+            cur.execute(sql)
+
+        # commit changes to database
         con.commit()
 
     def table_exists(self):
         """Creates a data table for a participant and data source if doesn't exist already"""
 
+        # check if table exists with psycopg2
         con = Connections.get(self.schema_name)
         with con.cursor() as cur:
-            cur.execute(f'''
+
+            # check if table exists by executing sql query
+            sql = f'''
                 select exists(
                   select
                     from pg_tables
@@ -139,9 +168,13 @@ class BaseDataTableWrapper(ABC):
                     schemaname = '{self.schema_name}' and
                     tablename = '{self.table_name}'
                 ) as exists
-              ''')
+              '''
+            cur.execute(sql)
+
+            # get result of query from cursor
             ans = cur.fetchone()['exists']
 
+        # return result (True if table exists, False otherwise)
         return ans
 
     def insert(
@@ -156,50 +189,81 @@ class BaseDataTableWrapper(ABC):
         :param value: value of the data record
         :param commit: whether to commit the changes to database
         """
+        # pylint: disable=too-many-locals
 
-        # assert that `value` is a dictionary
+        # verify that `value` is a dictionary
         if not isinstance(value, dict):
             raise ValueError('value must be a dictionary!')
 
-        # get columns for validating data and making sql query
-        columns_arr = []   # NOTE: columns sequence must be preserved (dynamic schema management)
-        column_py_types = {'timestamp': datetime, 'text': str, 'integer': int, 'float': float}
-        for column in self.data_source_columns:
+        # verify the types and constraints of provided values
+        for column in self.columns:
 
-            # skip reserved column
-            if column.name == BaseDataTableWrapper.TS_COL_NAME:
-                continue   # reserved column (added automatically)
+            # skip `timestamp` as it is added separately later
+            if column.name == ColumnTypes.TIMESTAMP.name:
+                continue
 
-            # verify that `value` contains all columns of `data_source`
+            # verify that column is present in value
             if column.name not in value:
-                raise ValueError(f'Column {column.name} is missing from value!')
+                raise ValueError(f'Column {column.name} is missing in value')
 
-            # add column to columns_arr
-            columns_arr.append((column.name, column_py_types[column.column_type]))
+            # verify that column type is correct
+            col_pytype = settings.ColumnTypes.from_str(column.column_type).py_type
+            if not isinstance(value[column.name], col_pytype):
+                raise ValueError(f'Column {column.name} has incorrect type')
 
-        # make sql params (columns and args)
-        col_names_str = ', '.join([colname for colname, _ in columns_arr])
-        col_vals_args = [value[colname] for colname, _ in columns_arr]
+            # assert that provided value complies with column constraints
+            if column.accept_values:
 
-        # assert that all columns are present in value and types are correct
-        for colname, expected_type in columns_arr:
-            if colname not in value:
-                raise ValueError(f'Column {colname} is missing in value')
-            if not isinstance(value[colname], expected_type):
-                raise ValueError(f'Column {colname} has incorrect type')
+                # prepare array of accepted values
+                column_pytype = ColumnTypes.from_str(column.column_type).py_type
+                accepted_values = [column_pytype(v) for v in column.accept_values.split(',')]
 
-        # insert data record
+                # verify that provided value is in accepted values
+                if value[column.name] not in accepted_values:
+                    raise ValueError(', '.join([
+                        f'Column `{column.name}` has incorrect value',
+                        f'must be one of {accepted_values}',
+                    ]))
+
+        # prepare array of column names and values
+        column_names_arr = []   # e.g. ['col1', 'col2', 'col3']
+        column_values_arr = []   # e.g. ['val1', 'val2', 'val3']
+        for column in self.columns:
+            if column.name == ColumnTypes.TIMESTAMP.name:
+                continue   # skip `timestamp` as it is added separately later
+            column_names_arr.append(column.name)
+            column_values_arr.append(value[column.name])
+
+        # merge columns part of sql query into a single string
+        # e.g. ['col1', 'col2', 'col3'] -> 'col1, col2, col3'
+        column_names_str = ', '.join(column_names_arr)
+
+        # insert data record with psycopg2
         con = Connections.get(self.schema_name)
         with con.cursor() as cur:
-            cur.execute(
+
+            # prepare values and their placeholders(e.g. '%s, %s, %s')
+            value_args_placeholders = ', '.join(['%s', '%s'] + ['%s']*len(column_values_arr))
+            value_args = [self.data_source_id, strip_tz(timestamp)] + column_values_arr
+
+            # insert data record by executing sql query
+            # e.g. insert into data.c1u1d1(ts, col1, col2, col3) values (%s, %s, %s, %s)
+            sql = cur.mogrify(
                 f'''
                 insert into
-                  {self.schema_name}.{self.table_name}(
-                    data_source_id, {BaseDataTableWrapper.TS_COL_NAME}, {col_names_str}
+                  {self.schema_name}.{self.table_name} (
+                    data_source_id,
+                    {ColumnTypes.TIMESTAMP.name},
+                    {column_names_str}
                   )
                 values
-                  (%s, %s, {", ".join(["%s"] * len(columns_arr))})
-                ''', [self.data_source_id, strip_tz(timestamp)] + col_vals_args)
+                  ({value_args_placeholders})
+                ''',
+                value_args,
+            )
+            cur.execute(sql)
+
+        # commit changes to database (if requested by caller)
         if commit:
             con.commit()
 
@@ -208,7 +272,11 @@ class BaseDataTableWrapper(ABC):
         con = Connections.get(self.schema_name)
         con.commit()
 
-    def select_next_k(self, from_ts: datetime, limit: int) -> List[DataRecord]:
+    def select_next_k(
+        self,
+        from_ts: datetime,
+        limit: int,
+    ) -> List[DataRecord]:
         """
         Retrieves next k data records from database
         :param participant: participant that has refernece to user and campaign
@@ -218,35 +286,50 @@ class BaseDataTableWrapper(ABC):
         :return: list of data records
         """
 
+        # select data records with psycopg2
         con = Connections.get(self.schema_name)
         with con.cursor() as cur:
-            cur.execute(
+
+            # select data records by executing sql query
+            sql = cur.mogrify(
                 f'''
                 select
-                  *
+                    *
                 from
-                  {self.schema_name}.{self.table_name}
+                    {self.schema_name}.{self.table_name}
                 where
-                  data_source_id = %s and
-                  {BaseDataTableWrapper.TS_COL_NAME} >= %s limit %s
+                    data_source_id = %s and
+                    {ColumnTypes.TIMESTAMP.name} >= %s
+                limit
+                    %s
                 ''', (
                     self.data_source_id,
                     strip_tz(from_ts),
                     limit,
                 ))
+            cur.execute(sql)
+
+            # get result of query from cursor
             rows = cur.fetchall()
 
-        ans = []
+        # convert rows to list of DataRecord objects
+        ans: List[DataRecord] = []
         for row in rows:
-            ans.append(
-                DataRecord(
-                    data_source = mdl.DataSource.get_by_id(pk = row['data_source_id']),
-                    timestamp = row['ts'],
-                    value = row['val'],
-                ))
+            data_record = DataRecord(
+                data_source = mdl.DataSource.get_by_id(pk = row['data_source_id']),
+                timestamp = row['ts'],
+                value = row['val'],
+            )
+            ans.append(data_record)
+
+        # return list of DataRecord objects
         return ans
 
-    def select_range(self, from_ts: datetime, till_ts: datetime) -> List[DataRecord]:
+    def select_range(
+        self,
+        from_ts: datetime,
+        till_ts: datetime,
+    ) -> List[DataRecord]:
         """
         Retrieves filtered data based on provided range (start and end timestamps)
         :param participant: participant that has refernece to user and campaign
@@ -256,9 +339,12 @@ class BaseDataTableWrapper(ABC):
         :return: list of data records
         """
 
+        # select data records with psycopg2
         con = Connections.get(self.schema_name)
         with con.cursor() as cur:
-            cur.execute(
+
+            # select data records by executing sql query
+            sql = cur.mogrify(
                 f'''
                 select
                   *
@@ -266,23 +352,29 @@ class BaseDataTableWrapper(ABC):
                   {self.schema_name}.{self.table_name}
                 where
                   data_source_id = %s and
-                  {BaseDataTableWrapper.TS_COL_NAME} >= %s and
-                  {BaseDataTableWrapper.TS_COL_NAME} < %s
+                  {ColumnTypes.TIMESTAMP.name} >= %s and
+                  {ColumnTypes.TIMESTAMP.name} < %s
                 ''', (
                     self.data_source_id,
                     strip_tz(from_ts),
                     strip_tz(till_ts),
                 ))
+            cur.execute(sql)
+
+            # get result of query from cursor
             rows = cur.fetchall()
 
-        ans = []
+        # convert rows to list of DataRecord objects
+        ans: List[DataRecord] = []
         for row in rows:
-            ans.append(
-                DataRecord(
-                    data_source = mdl.DataSource.get_by_id(pk = row['data_source_id']),
-                    timestamp = row['ts'],
-                    value = row['val'],
-                ))
+            data_record = DataRecord(
+                data_source = mdl.DataSource.get_by_id(pk = row['data_source_id']),
+                timestamp = row['ts'],
+                value = row['val'],
+            )
+            ans.append(data_record)
+
+        # return list of DataRecord objects
         return ans
 
     def select_first_ts(self) -> Optional[datetime]:
@@ -298,13 +390,13 @@ class BaseDataTableWrapper(ABC):
             cur.execute(
                 f'''
                 select
-                  ts
+                  {ColumnTypes.TIMESTAMP.name}
                 from
                   {self.schema_name}.{self.table_name}
                 where
                   data_source_id = %s
                 order by
-                  ts asc
+                  {ColumnTypes.TIMESTAMP.name} asc
                 limit 1
                 ''',
                 (self.data_source_id,),
@@ -326,13 +418,13 @@ class BaseDataTableWrapper(ABC):
             cur.execute(
                 f'''
                 select
-                  ts
+                  {ColumnTypes.TIMESTAMP.name}
                 from
                   {self.schema_name}.{self.table_name}
                 where
                   data_source_id = %s
                 order by
-                  ts desc
+                  {ColumnTypes.TIMESTAMP.name} desc
                 limit 1
                 ''',
                 (self.data_source_id,),
@@ -359,23 +451,32 @@ class DataTable(BaseDataTableWrapper):
         :return: amount of data records within the range
         """
 
+        # select data records with psycopg2
         con = Connections.get(self.schema_name)
         with con.cursor() as cur:
-            cur.execute(
+
+            # select data records by executing sql query
+            sql = cur.mogrify(
                 f'''
                 select
                   count(*)
                 from
                   {self.schema_name}.{self.table_name}
                 where
-                  data_source_id = %s and ts >= %s and ts < %s
+                  data_source_id = %s and
+                  {ColumnTypes.TIMESTAMP.name} >= %s and
+                  {ColumnTypes.TIMESTAMP.name} < %s
                 ''', (
                     self.data_source_id,
                     strip_tz(from_ts),
                     strip_tz(till_ts),
                 ))
+            cur.execute(sql)
+
+            # get result of query from cursor
             ans = cur.fetchone()[0]
 
+        # return the amount of data records
         return ans
 
     def dump_to_file(self) -> str:

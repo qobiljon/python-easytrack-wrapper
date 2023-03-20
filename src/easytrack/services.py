@@ -1,5 +1,6 @@
 '''Services module for making modifications to database.'''
 
+# stdlib
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
@@ -8,6 +9,7 @@ from . import selectors as slc
 from . import models as mdl
 from . import wrappers
 from .utils import notnull
+from .settings import ColumnTypes
 
 
 def create_user(
@@ -250,15 +252,20 @@ def create_column(
     :param accept_values: comma-separated list of accepted values
     :return: Column object
     """
+    # pylint: disable=too-many-branches
 
-    # assert that name is not empty
+    # verify that name is not empty
     if not name:
         raise ValueError('Name cannot be empty!')
 
-    # type must be one of ['timestamp', 'text', 'integer', 'float']
-    valid_types = ['timestamp', 'text', 'integer', 'float']
-    if column_type not in valid_types:
-        raise ValueError(f'Invalid type value! Must be one of {valid_types}')
+    # verify that name is not a reserved string
+    if name in [ColumnTypes.TIMESTAMP.name]:
+        raise ValueError(f'"{name}" is a reserved string!')
+
+    # type must be one of the valid types
+    valid_type_strs = [x.name for x in ColumnTypes.all()]
+    if column_type not in valid_type_strs:
+        raise ValueError(f'Invalid type value! Must be one of {valid_type_strs}')
 
     # text columns must be categorical
     if is_categorical is None:
@@ -266,24 +273,33 @@ def create_column(
     if column_type == 'text' and not is_categorical:
         raise ValueError('text columns must be categorical!')
 
-    # comma-separated list of values must be appropriate for type (if accept_values is not None)
+    # verify formatting of accept_values
     accept_values_str = None
     if accept_values is not None:
-        accept_values_arr = map(str.strip, accept_values.split(','))
+        tmp = [str.strip(x) for x in accept_values.strip().split(',')]
+
+        # verify that accept_values is not empty
+        if not tmp:
+            raise ValueError('accept_values cannot be empty!')
+
+        # verify that accept_values has no duplicates
+        if len(tmp) != len(set(tmp)):
+            raise ValueError('accept_values cannot have duplicates!')
+
+        # verify formatting and type of accept_values
         if column_type == 'integer':
-            for value in accept_values_arr:
+            for value in tmp:
                 try:
                     int(value)
                 except ValueError as exc:
                     raise ValueError(f'Invalid integer value: {value}') from exc
         elif column_type == 'float':
-            for value in accept_values_arr:
+            for value in tmp:
                 try:
                     float(value)
                 except ValueError as exc:
                     raise ValueError(f'Invalid float value: {value}') from exc
-
-        accept_values_str = ','.join(accept_values_arr)
+        accept_values_str = ','.join(tmp)
 
     # create column
     return mdl.Column.create(
@@ -313,7 +329,7 @@ def create_data_source(
     if not columns:
         raise ValueError('columns cannot be empty!')
 
-    # check if data source already exists
+    # check if data source already exists (by name)
     data_source = mdl.DataSource.get_or_none(name = notnull(name))
     if data_source:
         return data_source
@@ -322,17 +338,17 @@ def create_data_source(
     data_source = mdl.DataSource.create(name = name)
 
     # add timestamp (reserved) column
-    mdl.Column.create(
-        data_source = data_source,
-        name = wrappers.BaseDataTableWrapper.TS_COL_NAME,
+    timestamp_column = mdl.Column.create(
+        name = ColumnTypes.TIMESTAMP.name,
         column_type = 'timestamp',
         is_categorical = False,
     )
+    mdl.DataSourceColumn.create(data_source = data_source, column = timestamp_column)
 
-    # add other columns to data source
+    # add columns (except reserved `timestamp` column)
     for column in columns:
-        if column.name == wrappers.BaseDataTableWrapper.TS_COL_NAME:
-            continue   # skip reserved timestamp column
+        if column.name == ColumnTypes.TIMESTAMP.name:
+            continue   # skip reserved `timestamp` column (already added)
         mdl.DataSourceColumn.create(data_source = data_source, column = column)
 
     return data_source

@@ -1,21 +1,26 @@
 """Unit tests for easytrack package."""
 # pylint: disable=no-value-for-parameter
+# pylint: disable=too-many-lines
 
+# stdlib
+from typing import Dict
 from unittest import TestCase
 from datetime import datetime
 from datetime import timedelta
 from random import randint
-
 from os import getenv
-from dotenv import load_dotenv
 
+# 3rd party
+from dotenv import load_dotenv
 import psycopg2 as pg2
 
+# local
 from . import models as mdl
 from . import selectors as slc
 from . import services as svc
 from . import wrappers
 from . import init
+from .settings import ColumnTypes
 
 
 class BaseTestCase(TestCase):
@@ -145,8 +150,20 @@ class BaseTestCase(TestCase):
             name = name,
             columns = [
                 mdl.Column.create(
-                    name = 'value',
-                    column_type = 'float',
+                    name = ColumnTypes.TEXT.name,
+                    column_type = ColumnTypes.TEXT.name,
+                    is_categorical = False,
+                    accept_values = None,
+                ),
+                mdl.Column.create(
+                    name = ColumnTypes.INTEGER.name,
+                    column_type = ColumnTypes.INTEGER.name,
+                    is_categorical = False,
+                    accept_values = None,
+                ),
+                mdl.Column.create(
+                    name = ColumnTypes.FLOAT.name,
+                    column_type = ColumnTypes.FLOAT.name,
                     is_categorical = False,
                     accept_values = None,
                 ),
@@ -295,12 +312,12 @@ class ColumnTestCase(BaseTestCase):
         '''Test that a column cannot be created with invalid type.'''
 
         # invalid type (i.e. none of ['timestamp', 'text', 'integer', 'float']])
-        for column_type in ['', None]:
+        for variation in ['', 'dummy', 1, None]:
             self.assertRaises(
                 ValueError,
                 svc.create_column,
                 name = 'dummy',
-                column_type = column_type,
+                column_type = variation,
                 is_categorical = True,
                 accept_values = 'a,b,c',
             )
@@ -319,33 +336,70 @@ class ColumnTestCase(BaseTestCase):
     def test_invalid_accept_values(self):
         '''Test that a column cannot be created with invalid accept values.'''
 
-        # integer check
+        # passing text to integer column
         self.assertRaises(
             ValueError,
             svc.create_column,
             name = 'dummy',
             column_type = 'integer',
             is_categorical = True,
-            accept_values = 'a,b,c',
-        )
-        self.assertRaises(
-            ValueError,
-            svc.create_column,
-            name = 'dummy',
-            column_type = 'integer',
-            is_categorical = True,
-            accept_values = '1,2,3.4',
+            accept_values = 'a',
         )
 
-        # float check
+        # passing float to integer column
+        self.assertRaises(
+            ValueError,
+            svc.create_column,
+            name = 'dummy',
+            column_type = 'integer',
+            is_categorical = True,
+            accept_values = '1.2',
+        )
+
+        # passing text to float column
         self.assertRaises(
             ValueError,
             svc.create_column,
             name = 'dummy',
             column_type = 'float',
             is_categorical = True,
-            accept_values = 'a,b,c',
+            accept_values = 'a',
         )
+
+        # empty value among accept values
+        for variation in [',', ' , ,1', '1,2,,3', '1,2,3,', ',1,2,3']:
+            self.assertRaises(
+                ValueError,
+                svc.create_column,
+                name = 'dummy',
+                column_type = 'integer',
+                is_categorical = True,
+                accept_values = variation,
+            )
+
+        # duplicate value among accept values
+        for variation in ['1,2,3,1', '1,2,3,2', '1,2,3,3']:
+            self.assertRaises(
+                ValueError,
+                svc.create_column,
+                name = 'dummy',
+                column_type = 'integer',
+                is_categorical = True,
+                accept_values = variation,
+            )
+
+    def test_reserved_column_name(self):
+        ''' Test that a column cannot be created with a reserved name. '''
+
+        for column_type in [ColumnTypes.TIMESTAMP]:
+            self.assertRaises(
+                ValueError,
+                svc.create_column,
+                name = column_type.name,
+                column_type = column_type.name,
+                is_categorical = False,
+                accept_values = None,
+            )
 
     def test_valid(self):
         '''Test that a column can be created with valid parameters.''' ''
@@ -361,34 +415,37 @@ class ColumnTestCase(BaseTestCase):
         self.assertIsInstance(column, mdl.Column)
 
         # text
-        column = svc.create_column(
-            name = 'dummy',
-            column_type = 'text',
-            is_categorical = True,
-            accept_values = 'a,b,c',
-        )
-        self.assertIsNotNone(column)
-        self.assertIsInstance(column, mdl.Column)
+        for variation in ['a', 'a,b', 'a,b,c']:
+            column = svc.create_column(
+                name = 'dummy',
+                column_type = 'text',
+                is_categorical = True,
+                accept_values = variation,
+            )
+            self.assertIsNotNone(column)
+            self.assertIsInstance(column, mdl.Column)
 
         # integer
-        column = svc.create_column(
-            name = 'dummy',
-            column_type = 'integer',
-            is_categorical = True,
-            accept_values = '1,2,3',
-        )
-        self.assertIsNotNone(column)
-        self.assertIsInstance(column, mdl.Column)
+        for variation in ['1', '1,2', '1,2,3']:
+            column = svc.create_column(
+                name = 'dummy',
+                column_type = 'integer',
+                is_categorical = True,
+                accept_values = variation,
+            )
+            self.assertIsNotNone(column)
+            self.assertIsInstance(column, mdl.Column)
 
-        # float
-        column = svc.create_column(
-            name = 'dummy',
-            column_type = 'float',
-            is_categorical = True,
-            accept_values = '1.1,2.2,3.3',
-        )
-        self.assertIsNotNone(column)
-        self.assertIsInstance(column, mdl.Column)
+        # float (including integer values)
+        for variation in ['1', '1,2', '1,2,3', '1.1', '1.1,2.2', '1.1,2.2,3.3']:
+            column = svc.create_column(
+                name = 'dummy',
+                column_type = 'float',
+                is_categorical = True,
+                accept_values = variation,
+            )
+            self.assertIsNotNone(column)
+            self.assertIsInstance(column, mdl.Column)
 
 
 class DataSourceTestCase(BaseTestCase):
@@ -417,16 +474,22 @@ class DataSourceTestCase(BaseTestCase):
         '''Test that a data source cannot be created with invalid name.'''
 
         # array of 2 dummy columns
-        columns = [
-            svc.create_column(
-                name = 'timestamp',
-                column_type = 'timestamp',
+        dummy_columns = [
+            mdl.Column.create(
+                name = ColumnTypes.FLOAT.name,
+                column_type = ColumnTypes.FLOAT.name,
                 is_categorical = False,
                 accept_values = None,
             ),
-            svc.create_column(
-                name = 'value',
-                column_type = 'float',
+            mdl.Column.create(
+                name = ColumnTypes.INTEGER.name,
+                column_type = ColumnTypes.INTEGER.name,
+                is_categorical = False,
+                accept_values = None,
+            ),
+            mdl.Column.create(
+                name = ColumnTypes.TEXT.name,
+                column_type = ColumnTypes.TEXT.name,
                 is_categorical = False,
                 accept_values = None,
             ),
@@ -438,7 +501,7 @@ class DataSourceTestCase(BaseTestCase):
                 ValueError,
                 svc.create_data_source,
                 name = name,
-                columns = columns,
+                columns = dummy_columns,
             )
 
     def test_data_source_invalid_columns(self):
@@ -522,29 +585,69 @@ class DataSourceTestCase(BaseTestCase):
         '''Test that columns are created after a data source is created.'''
 
         # create columns
-        columns = [
+        expected_columns = [
             mdl.Column.create(
-                name = 'timestamp',
-                column_type = 'timestamp',
+                name = ColumnTypes.FLOAT.name,
+                column_type = ColumnTypes.FLOAT.name,
                 is_categorical = False,
                 accept_values = None,
             ),
             mdl.Column.create(
-                name = 'value',
-                column_type = 'float',
+                name = ColumnTypes.INTEGER.name,
+                column_type = ColumnTypes.INTEGER.name,
+                is_categorical = False,
+                accept_values = None,
+            ),
+            mdl.Column.create(
+                name = ColumnTypes.TEXT.name,
+                column_type = ColumnTypes.TEXT.name,
                 is_categorical = False,
                 accept_values = None,
             ),
         ]
 
         # create a data source
-        data_source = svc.create_data_source(name = 'dummy', columns = columns)
+        data_source = svc.create_data_source(name = 'dummy', columns = expected_columns)
 
         # check that columns are created
+        actual_columns = slc.get_data_source_columns(data_source = data_source)
+
+        # +1 because timestamp column is always created
+        self.assertEqual(len(actual_columns), len(expected_columns) + 1)
+
+        # check that all expected columns are created
+        for expected_column in expected_columns:
+
+            # check that column is created
+            self.assertIn(expected_column, actual_columns)
+
+            # get the created column
+            actual_column = actual_columns[actual_columns.index(expected_column)]
+
+            # check that column name and type are correct
+            self.assertEqual(expected_column.name, actual_column.name)
+            self.assertEqual(expected_column.column_type, actual_column.column_type)
+
+    def test_timestamp_always_present(self):
+        ''' Test that a timestamp column is always present in a data source.'''
+
+        # create a data source
+        data_source = svc.create_data_source(
+            name = 'dummy',
+            columns = [
+                mdl.Column.create(
+                    name = 'value',
+                    column_type = 'float',
+                    is_categorical = False,
+                    accept_values = None,
+                ),
+            ],
+        )
+
+        # check that timestamp column is created
         data_source_columns = slc.get_data_source_columns(data_source = data_source)
-        self.assertEqual(len(data_source_columns), len(columns))
-        for column in data_source_columns:
-            self.assertIn(column, columns)
+        self.assertEqual(len(data_source_columns), 2)
+        self.assertIn('timestamp', [column.name for column in data_source_columns])
 
 
 class DataTableTestCase(BaseTestCase):
@@ -672,12 +775,19 @@ class DataTableTestCase(BaseTestCase):
             0,
         )
 
+        # prepare dummy datapoint
+        data_point = {
+            ColumnTypes.TEXT.name: 'dummy',
+            ColumnTypes.INTEGER.name: 7,
+            ColumnTypes.FLOAT.name: 3.5,
+        }
+
         # add data
         svc.create_data_record(
             participant = participant,
             data_source = data_source,
             timestamp = now_ts,
-            value = {'value': 1.5},
+            value = data_point,
         )
 
         # verify amount of data
@@ -696,9 +806,7 @@ class DataTableTestCase(BaseTestCase):
             participant = participant,
             data_source_ids = [data_source.id]*random_amount,
             timestamps = [ts_now + timedelta(seconds = x) for x in range(random_amount)],
-            values = [{
-                'value': 1.5
-            }]*random_amount,
+            values = [data_point]*random_amount,
         )
 
         # verify amount of data
@@ -742,8 +850,9 @@ class DataTableTestCase(BaseTestCase):
 
         # prepare dummy value
         value = {
-            'timestamp': now_ts,   # column 1
-            'value': 2.5,   # column 2
+            ColumnTypes.TEXT.name: 'dummy',
+            ColumnTypes.INTEGER.name: 3,
+            ColumnTypes.FLOAT.name: 1.5,
         }
 
         # insert data and check amounts
@@ -779,6 +888,7 @@ class HourlyStatsTestcase(BaseTestCase):
         svc.add_campaign_participant(campaign = campaign, add_user = user)
         participant = slc.get_participant(campaign = campaign, user = user)
         columns = slc.get_data_source_columns(data_source = data_source)
+        columns = [x for x in columns if x.name != ColumnTypes.TIMESTAMP.name]
 
         # verify that there is no data (yet)
         now_ts = datetime.now()
@@ -787,14 +897,20 @@ class HourlyStatsTestcase(BaseTestCase):
             data_source = data_source,
             hour_timestamp = now_ts,
         )
-        self.assertTrue(all(tmp[column] == 0 for column in columns))
+        for column in columns:
+            self.assertTrue(not any(tmp[column].values()))
+
+        # make amounts of data
+        amount: Dict[int, Dict[str, int]] = {}
+        for column in columns:
+            amount[column.id] = {'value': 1}
 
         # update hourly stats table (add one data point)
         mdl.HourlyStats.insert(
             participant = participant,
             data_source = data_source,
             timestamp = now_ts.replace(minute = 0, second = 0, microsecond = 0),
-            amount = {column.id: 1 for column in columns},
+            amount = amount,
         ).execute()
 
         # verify amount of data with get_filtered_amount_of_data
@@ -803,7 +919,8 @@ class HourlyStatsTestcase(BaseTestCase):
             data_source = data_source,
             hour_timestamp = now_ts,
         )
-        self.assertTrue(all(tmp[column] == 1 for column in columns))
+        for column in columns:
+            self.assertTrue(all(x == 1 for x in tmp[column].values()))
 
     def test_hourly_stats_edges(self):
         ''' Test that the hourly stats table is correctly updated. '''
@@ -816,6 +933,7 @@ class HourlyStatsTestcase(BaseTestCase):
         svc.add_campaign_participant(campaign = campaign, add_user = user)
         participant = slc.get_participant(campaign = campaign, user = user)
         columns = slc.get_data_source_columns(data_source = data_source)
+        columns = [x for x in columns if x.name != ColumnTypes.TIMESTAMP.name]
 
         # prepare edge case timestamps
         tmp = datetime.now().replace(minute = 0, second = 0, microsecond = 0)
@@ -824,27 +942,38 @@ class HourlyStatsTestcase(BaseTestCase):
         time1 = time0 + timedelta(hours = 1)   # yesterday this time + 1 hour (later)
         time1_amount = 2
 
-        # add amounts at time0, and time1
+        # add amounts at time0
+        amount: Dict[int, Dict[str, int]] = {}
+        for column in columns:
+            amount[column.id] = {'value': time0_amount}
+        # update hourly stats table (add one data point)
         mdl.HourlyStats.insert(
             participant = participant,
             data_source = data_source,
             timestamp = time0,
-            amount = {column.id: time0_amount for column in columns},
+            amount = amount,
         ).execute()
+
+        # add amounts at time1
+        amount: Dict[int, Dict[str, int]] = {}
+        for column in columns:
+            amount[column.id] = {'value': time1_amount}
+        # update hourly stats table (add one data point)
         mdl.HourlyStats.insert(
             participant = participant,
             data_source = data_source,
             timestamp = time1,
-            amount = {column.id: time1_amount for column in columns},
+            amount = amount,
         ).execute()
 
-        # verify before time0
+        # verify before time0 (should be empty)
         tmp = slc.get_hourly_amount_of_data(
             participant = participant,
             data_source = data_source,
             hour_timestamp = time0 - timedelta(seconds = 1),
         )
-        self.assertTrue(all(tmp[column] == 0 for column in columns))
+        for column in columns:
+            self.assertFalse(any(tmp[column].values()))
 
         # verify at time0
         tmp = slc.get_hourly_amount_of_data(
@@ -852,7 +981,8 @@ class HourlyStatsTestcase(BaseTestCase):
             data_source = data_source,
             hour_timestamp = time0,
         )
-        self.assertTrue(all(tmp[column] == time0_amount for column in columns))
+        for column in columns:
+            self.assertTrue(all(x == time0_amount for x in tmp[column].values()))
 
         # verify between time0 and time1
         tmp = slc.get_hourly_amount_of_data(
@@ -860,7 +990,8 @@ class HourlyStatsTestcase(BaseTestCase):
             data_source = data_source,
             hour_timestamp = time0 + timedelta(seconds = 1),
         )
-        self.assertTrue(all(tmp[column] == time0_amount for column in columns))
+        for column in columns:
+            self.assertTrue(all(x == time0_amount for x in tmp[column].values()))
 
         # verify at time1
         tmp = slc.get_hourly_amount_of_data(
@@ -868,7 +999,8 @@ class HourlyStatsTestcase(BaseTestCase):
             data_source = data_source,
             hour_timestamp = time1,
         )
-        self.assertTrue(all(tmp[column] == time1_amount for column in columns))
+        for column in columns:
+            self.assertTrue(all(x == time1_amount for x in tmp[column].values()))
 
         # verify after time1
         tmp = slc.get_hourly_amount_of_data(
@@ -876,4 +1008,5 @@ class HourlyStatsTestcase(BaseTestCase):
             data_source = data_source,
             hour_timestamp = time1 + timedelta(seconds = 1),
         )
-        self.assertTrue(all(tmp[column] == time1_amount for column in columns))
+        for column in columns:
+            self.assertTrue(all(x == time1_amount for x in tmp[column].values()))
