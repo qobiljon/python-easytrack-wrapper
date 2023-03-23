@@ -364,10 +364,23 @@ def create_data_record(
     Creates a data record in raw data table (e.g. sensor reading)
     :param participant: participant of a campaign
     :param data_source: data source of the data record
-    :param ts: timestamp
-    :param val: value
-    :return: None
+    :param timestamp: timestamp of the data record
+    :param value: value of the data record (dict of column id and value)
     """
+
+    # verify that content of `value` corresponds to data source columns
+    columns = slc.get_data_source_columns(data_source = data_source)
+    for column in columns:
+        # column id must be in `value`
+        if column.id not in value:
+            raise ValueError(f'Column id {column.id} is missing in value!')
+
+        # verify that value is of correct type
+        ColumnTypes.from_str(column.column_type).verify_value(value[column.id])
+
+        # accept_values must be None or value must be in accept_values
+        if column.accept_values is not None:
+            accept_values = [str.strip(x) for x in column.accept_values.split(',')]
 
     wrappers.DataTable(participant = participant, data_source = data_source).insert(
         timestamp = timestamp,
@@ -411,6 +424,35 @@ def create_data_records(
             timestamp = timestamp,
             value = value,
         )
+
+
+def create_hourly_stats(
+    participant: mdl.Participant,
+    data_source: mdl.DataSource,
+    till_ts: datetime,
+    amounts: Dict[int, int],
+):
+    '''
+    Creates hourly stats for a participant
+    :param participant: participant of a campaign
+    :param data_source: data source of the data record
+    :param till_ts: timestamp till which stats are calculated
+    :param amounts: dict of amounts (key: column id, value: amount of data records)
+    '''
+
+    # verify column ids are valid
+    column_ids = {column.id for column in slc.get_data_source_columns(data_source = data_source)}
+    for column_id in amounts.keys():
+        if column_id not in column_ids:
+            raise ValueError(f'Invalid column id: {column_id}')
+
+    # create hourly stats
+    mdl.HourlyStats.create(
+        participant = participant,
+        data_source = data_source,
+        ts = till_ts,
+        amount = new_amount,
+    )
 
 
 def dump_data(

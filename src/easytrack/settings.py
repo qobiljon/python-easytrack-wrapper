@@ -37,6 +37,11 @@ class ColumnTypes:
             self.py_type = py_type
             self.pg_type = pg_type
 
+        def verify_value(self, value):
+            ''' Verifies that the given value is of the correct type. '''
+            if not isinstance(value, self.py_type):
+                raise ValueError(f'Expected {self.py_type}, got {type(value)}')
+
     TIMESTAMP = ColumnType(
         name = 'timestamp',
         py_type = datetime,

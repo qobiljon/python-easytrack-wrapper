@@ -25,6 +25,15 @@ def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
     return None   # both user_id and email are None
 
 
+def get_all_campaigns() -> List[models.Campaign]:
+    """
+    List of all campaigns in database
+    :return: the list of campaigns
+    """
+
+    return models.Campaign.select()
+
+
 def is_participant(campaign: models.Campaign, user: models.User) -> bool:
     """
     Checks whether a user is a campaign's participant or not
