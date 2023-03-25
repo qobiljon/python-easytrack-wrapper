@@ -421,6 +421,7 @@ def create_hourly_stats(
             raise ValueError(f'Invalid column id: {column_id}')
 
     # create hourly stats (i.e. insert into database)
+    # pylint: disable=no-value-for-parameter
     mdl.HourlyStats.insert(
         participant = participant,
         data_source = data_source,
