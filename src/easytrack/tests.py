@@ -754,6 +754,20 @@ class DataTableTestCase(BaseTestCase):
         added = slc.is_campaign_data_source(campaign = campaign, data_source = data_source)
         self.assertTrue(added)   # check that data source was added
 
+        # prepare dummy datapoints
+        columns = slc.get_data_source_columns(data_source = data_source)
+        data_point = {
+            ColumnTypes.TIMESTAMP.name: None,
+            ColumnTypes.TEXT.name: 'dummy',
+            ColumnTypes.INTEGER.name: 7,
+            ColumnTypes.FLOAT.name: 3.5,
+        }
+        for column in columns:
+            if column.name == ColumnTypes.TIMESTAMP.name:
+                continue
+            elif column.name == ColumnTypes.TEXT.name:
+                data_point[column.id] = randint(0, 100)
+
         # add participant to campaign
         user = self.new_user('participant')
         added = svc.add_campaign_participant(campaign = campaign, add_user = user)
@@ -774,13 +788,6 @@ class DataTableTestCase(BaseTestCase):
             ),
             0,
         )
-
-        # prepare dummy datapoint
-        data_point = {
-            ColumnTypes.TEXT.name: 'dummy',
-            ColumnTypes.INTEGER.name: 7,
-            ColumnTypes.FLOAT.name: 3.5,
-        }
 
         # add data
         svc.create_data_record(

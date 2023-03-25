@@ -1,4 +1,4 @@
-'''This module contains functions for selecting data from the database.'''
+''' Read operations / queries to easytrack's `core` and `data` tables. '''
 
 # stdlib
 from typing import List, Dict, Optional
@@ -8,6 +8,8 @@ from datetime import datetime
 from . import models
 from .utils import notnull
 from .settings import ColumnTypes
+
+# region user
 
 
 def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
@@ -25,6 +27,11 @@ def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
     return None   # both user_id and email are None
 
 
+# endregion
+
+# region campaign
+
+
 def get_all_campaigns() -> List[models.Campaign]:
     """
     List of all campaigns in database
@@ -32,80 +39,6 @@ def get_all_campaigns() -> List[models.Campaign]:
     """
 
     return models.Campaign.select()
-
-
-def is_participant(campaign: models.Campaign, user: models.User) -> bool:
-    """
-    Checks whether a user is a campaign's participant or not
-    :param user: user being checked
-    :param campaign: campaign being checked
-    :return: true if user is campaign's participant, false if not
-    """
-
-    return models.Participant.filter(campaign = notnull(campaign), user = notnull(user)).exists()
-
-
-def is_supervisor(campaign: models.Campaign, user: models.User) -> bool:
-    """
-    Checks whether a user is a campaign's supervisor or not
-    :param user: user being checked
-    :param campaign: campaign being checked
-    :return: true if user is campaign's supervisor, false if not
-    """
-
-    return models.Supervisor.filter(campaign = campaign, user = user).exists()
-
-
-def get_participant(campaign: models.Campaign, user: models.User) -> models.Participant:
-    """
-    Returns a participant object depending on the user and campaign provided
-    :param user: user key to search for a participant object
-    :param campaign: campaign key to search for a participant object
-    :return: participant object
-    """
-
-    return models.Participant.get_or_none(campaign = notnull(campaign), user = notnull(user))
-
-
-def get_supervisor(campaign: models.Campaign, user: models.User) -> models.Supervisor:
-    """
-    Returns a supervisor object depending on the user and campaign provided
-    :param user: user key to search for a supervisor object
-    :param campaign: campaign key to search for a supervisor object
-    :return: supervisor object
-    """
-
-    return models.Supervisor.get_or_none(campaign = notnull(campaign), user = notnull(user))
-
-
-def get_campaign_participants(campaign: models.Campaign) -> List[models.Participant]:
-    """
-    Returns list of participants of a campaign
-    :param campaign: campaign being queried
-    :return: list of campaign's participants
-    """
-
-    return models.Participant.filter(campaign = notnull(campaign))
-
-
-def get_campaign_participants_count(campaign: models.Campaign) -> int:
-    """
-    Returns count of participants of a campaign
-    :param campaign: campaign being queried
-    :return: number of campaign's participants
-    """
-
-    return models.Participant.filter(campaign = notnull(campaign)).count()
-
-
-def get_campaign_supervisors(campaign: models.Campaign) -> List[models.Supervisor]:
-    """
-    Returns list of a campaign's supervisors
-    :param campaign: campaign being queried
-    :return: list of campaign's supervisors
-    """
-
-    return models.Supervisor.filter(campaign = notnull(campaign))
 
 
 def get_campaign(campaign_id: int) -> Optional[models.Campaign]:
@@ -129,6 +62,95 @@ def get_supervisor_campaigns(user: models.User) -> List[models.Campaign]:
         map(lambda supervisor: supervisor.campaign, models.Supervisor.filter(user = notnull(user))))
 
 
+# endregion
+
+# region participant
+
+
+def is_participant(campaign: models.Campaign, user: models.User) -> bool:
+    """
+    Checks whether a user is a campaign's participant or not
+    :param user: user being checked
+    :param campaign: campaign being checked
+    :return: true if user is campaign's participant, false if not
+    """
+
+    return models.Participant.filter(campaign = notnull(campaign), user = notnull(user)).exists()
+
+
+def get_participant(campaign: models.Campaign, user: models.User) -> models.Participant:
+    """
+    Returns a participant object depending on the user and campaign provided
+    :param user: user key to search for a participant object
+    :param campaign: campaign key to search for a participant object
+    :return: participant object
+    """
+
+    return models.Participant.get_or_none(campaign = notnull(campaign), user = notnull(user))
+
+
+def get_campaign_participants(campaign: models.Campaign) -> List[models.Participant]:
+    """
+    Returns list of participants of a campaign
+    :param campaign: campaign being queried
+    :return: list of campaign's participants
+    """
+
+    return models.Participant.filter(campaign = notnull(campaign))
+
+
+def get_campaign_participants_count(campaign: models.Campaign) -> int:
+    """
+    Returns count of participants of a campaign
+    :param campaign: campaign being queried
+    :return: number of campaign's participants
+    """
+
+    return models.Participant.filter(campaign = notnull(campaign)).count()
+
+
+# endregion
+
+# region supervisor
+
+
+def is_supervisor(campaign: models.Campaign, user: models.User) -> bool:
+    """
+    Checks whether a user is a campaign's supervisor or not
+    :param user: user being checked
+    :param campaign: campaign being checked
+    :return: true if user is campaign's supervisor, false if not
+    """
+
+    return models.Supervisor.filter(campaign = campaign, user = user).exists()
+
+
+def get_supervisor(campaign: models.Campaign, user: models.User) -> models.Supervisor:
+    """
+    Returns a supervisor object depending on the user and campaign provided
+    :param user: user key to search for a supervisor object
+    :param campaign: campaign key to search for a supervisor object
+    :return: supervisor object
+    """
+
+    return models.Supervisor.get_or_none(campaign = notnull(campaign), user = notnull(user))
+
+
+def get_campaign_supervisors(campaign: models.Campaign) -> List[models.Supervisor]:
+    """
+    Returns list of a campaign's supervisors
+    :param campaign: campaign being queried
+    :return: list of campaign's supervisors
+    """
+
+    return models.Supervisor.filter(campaign = notnull(campaign))
+
+
+# endregion
+
+# region data source
+
+
 def find_data_source(data_source_id: int = None, name: str = None) -> Optional[models.DataSource]:
     """
     Used for finding DataSource object by either id or name.
@@ -142,18 +164,6 @@ def find_data_source(data_source_id: int = None, name: str = None) -> Optional[m
     if name is not None:
         return models.DataSource.get_or_none(name = name)
     return None   # both data_source_id and name are None
-
-
-def get_data_source_columns(data_source: models.DataSource) -> List[models.Column]:
-    """
-    Returns list of a data source's columns
-    :param data_source: data source being queried
-    :return: list of data source's columns
-    """
-
-    # get data source columns from mdl.DataSourceColumns
-    tmp = models.DataSourceColumn.filter(data_source = notnull(data_source))
-    return [data_source_column.column for data_source_column in tmp]
 
 
 def get_all_data_sources() -> List[models.DataSource]:
@@ -177,6 +187,39 @@ def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSour
             lambda campaign_data_source: campaign_data_source.data_source,
             models.CampaignDataSource.filter(campaign = notnull(campaign)),
         ))
+
+
+def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataSource):
+    """
+    Checks if data source is being used by a campaign
+    :param campaign: the campaign being queried
+    :param data_source: data source being queried
+    :return: whether data source is used by campaign
+    """
+
+    return models.CampaignDataSource.filter(campaign = campaign, data_source = data_source).exists()
+
+
+# endregion
+
+# region column
+
+
+def get_data_source_columns(data_source: models.DataSource) -> List[models.Column]:
+    """
+    Returns list of a data source's columns
+    :param data_source: data source being queried
+    :return: list of data source's columns
+    """
+
+    # get data source columns from mdl.DataSourceColumns
+    tmp = models.DataSourceColumn.filter(data_source = notnull(data_source))
+    return [data_source_column.column for data_source_column in tmp]
+
+
+# endregion
+
+# region hourly amounts
 
 
 def get_hourly_amount_of_data(
@@ -265,12 +308,4 @@ def get_hourly_amount_of_data(
     return ans
 
 
-def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataSource):
-    """
-    Checks if data source is being used by a campaign
-    :param campaign: the campaign being queried
-    :param data_source: data source being queried
-    :return: whether data source is used by campaign
-    """
-
-    return models.CampaignDataSource.filter(campaign = campaign, data_source = data_source).exists()
+# endregion

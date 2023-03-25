@@ -1,9 +1,10 @@
 version: "3.8"
 
 services:
+  # postgresql database server
   postgres:
     image: postgres:alpine
-    container_name: et-db
+    container_name: easytrack-postgres
     environment:
       POSTGRES_DBNAME: ${POSTGRES_DBNAME}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -11,7 +12,28 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
-      - "et-vol:/var/lib/postgresql/data"
+      - "easytrack-postgres-vol:/var/lib/postgresql/data"
+    networks:
+      - "easytrack-network"
+
+  # pgadmin4 database management tool
+  pgadmin4:
+    image: dpage/pgadmin4
+    container_name: easytrack-pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: easytrack@email.com
+      PGADMIN_DEFAULT_PASSWORD: easytrack
+    ports:
+      - "5050:80"
+    volumes:
+      - "easytrack-pgadmin4-vol:/var/lib/pgadmin"
+    networks:
+      - "easytrack-network"
 
 volumes:
-  et-vol:
+  easytrack-postgres-vol:
+  easytrack-pgadmin4-vol:
+
+networks:
+  easytrack-network:
+    external: true

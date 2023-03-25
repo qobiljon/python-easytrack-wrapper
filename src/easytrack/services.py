@@ -1,4 +1,4 @@
-'''Services module for making modifications to database.'''
+''' Write operations / queries to easytrack's `core` and `data` tables. '''
 
 # stdlib
 from datetime import datetime
@@ -10,6 +10,8 @@ from . import models as mdl
 from . import wrappers
 from .utils import notnull
 from .settings import ColumnTypes
+
+# region user
 
 
 def create_user(
@@ -47,64 +49,12 @@ def set_user_session_key(
     user.save()
 
 
-def add_campaign_participant(
-    campaign: mdl.Campaign,
-    add_user: mdl.User,
-) -> bool:
-    """
-    Binds user with campaign, making a participant.
-    :param add_user: User object to be bound to a campaign
-    :param campaign: Campaign object that user binds with
-    :return: whether user has been bound (false if already bound)
-    """
+# endregion
 
-    if slc.is_participant(user = notnull(add_user), campaign = notnull(campaign)):
-        return False
-
-    # 1. bind the user to campaign
-    participant = mdl.Participant.create(campaign = campaign, user = add_user)
-
-    # 2. create a new data table for the participant
-    for data_source in slc.get_campaign_data_sources(campaign = campaign):
-        wrappers.DataTable(participant = participant, data_source = data_source).create_table()
-        wrappers.AggDataTable(participant = participant, data_source = data_source).create_table()
-
-    return True
+# region campaign
 
 
-def add_supervisor_to_campaign(
-    supervisor: mdl.Supervisor,
-    new_user: mdl.User,
-) -> bool:
-    """
-    Binds user with campaign, making a supervisor.
-    :param new_user: User object to be bound to a campaign
-    :param supervisor: Supervisor object that user binds with
-    :return: whether user has been bound (false if already bound)
-    """
-
-    campaign: mdl.Campaign = notnull(supervisor).campaign
-
-    if slc.is_supervisor(user = notnull(new_user), campaign = notnull(campaign)):
-        return False
-
-    mdl.Supervisor.create(campaign = campaign, user = new_user)
-    return True
-
-
-def remove_supervisor_from_campaign(old_supervisor: mdl.Supervisor):
-    """
-    Removes a supervisor from a campaign
-    :param old_supervisor: Supervisor object to be removed
-    :return: None
-    """
-
-    campaign: mdl.Campaign = notnull(old_supervisor).campaign
-    if old_supervisor.user != campaign.owner:
-        old_supervisor.delete()
-
-
-def create_campaign(   # pylint: disable=too-many-arguments
+def create_campaign(
     owner: mdl.User,
     name: str,
     description: Optional[str],
@@ -151,48 +101,6 @@ def create_campaign(   # pylint: disable=too-many-arguments
     return campaign
 
 
-def add_campaign_data_source(
-    campaign: mdl.Campaign,
-    data_source: mdl.DataSource,
-) -> bool:
-    """
-    Adds a data source to campaign
-    :param campaign: the campaign to add data source to
-    :param data_source: data source being added
-    :return: whether data source has been added (false if already added)
-    """
-
-    if slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
-        return False
-
-    mdl.CampaignDataSource.create(campaign = campaign, data_source = data_source)
-    for participant in slc.get_campaign_participants(campaign):
-        wrappers.DataTable(participant, data_source).create_table()
-    return True
-
-
-def remove_campaign_data_source(
-    campaign: mdl.Campaign,
-    data_source: mdl.DataSource,
-):
-    """
-    Removes a data source from a campaign
-    :param campaign: the campaign to remove data source from
-    :param data_source: data source being removed
-    :return: None
-    """
-
-    if not slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
-        return
-
-    campaign_data_sources = mdl.CampaignDataSource.filter(
-        campaign = campaign,
-        data_source = data_source,
-    )
-    for campaign_data_source in campaign_data_sources:
-        campaign_data_source.delete_instance()
-
-
 def update_campaign(
     supervisor: mdl.Supervisor,
     name: str,
@@ -236,6 +144,169 @@ def delete_campaign(supervisor: mdl.Supervisor):
     campaign: mdl.Campaign = notnull(supervisor).campaign
     if supervisor.user == campaign.owner:
         campaign.delete_instance()
+
+
+# endregion
+
+# region participant
+
+
+def add_campaign_participant(
+    campaign: mdl.Campaign,
+    add_user: mdl.User,
+) -> bool:
+    """
+    Binds user with campaign, making a participant.
+    :param add_user: User object to be bound to a campaign
+    :param campaign: Campaign object that user binds with
+    :return: whether user has been bound (false if already bound)
+    """
+
+    if slc.is_participant(user = notnull(add_user), campaign = notnull(campaign)):
+        return False
+
+    # 1. bind the user to campaign
+    participant = mdl.Participant.create(campaign = campaign, user = add_user)
+
+    # 2. create a new data table for the participant
+    for data_source in slc.get_campaign_data_sources(campaign = campaign):
+        wrappers.DataTable(participant = participant, data_source = data_source).create_table()
+        wrappers.AggDataTable(participant = participant, data_source = data_source).create_table()
+
+    return True
+
+
+# endregion
+
+# region supervisor
+
+
+def add_supervisor_to_campaign(
+    supervisor: mdl.Supervisor,
+    new_user: mdl.User,
+) -> bool:
+    """
+    Binds user with campaign, making a supervisor.
+    :param new_user: User object to be bound to a campaign
+    :param supervisor: Supervisor object that user binds with
+    :return: whether user has been bound (false if already bound)
+    """
+
+    campaign: mdl.Campaign = notnull(supervisor).campaign
+
+    if slc.is_supervisor(user = notnull(new_user), campaign = notnull(campaign)):
+        return False
+
+    mdl.Supervisor.create(campaign = campaign, user = new_user)
+    return True
+
+
+def remove_supervisor_from_campaign(old_supervisor: mdl.Supervisor):
+    """
+    Removes a supervisor from a campaign
+    :param old_supervisor: Supervisor object to be removed
+    :return: None
+    """
+
+    campaign: mdl.Campaign = notnull(old_supervisor).campaign
+    if old_supervisor.user != campaign.owner:
+        old_supervisor.delete()
+
+
+# endregion
+
+# region data source
+
+
+def create_data_source(
+    name: str,
+    columns: List[mdl.DataSourceColumn],
+) -> mdl.DataSource:
+    """
+    Creates a data source object in database and returns DataSource object
+    :param name: name of the data source
+    :param columns: list of columns of the data source
+    :return: DataSource object
+    """
+
+    # assert that name is not empty
+    if not name:
+        raise ValueError('Name cannot be empty!')
+
+    # assert that columns are not empty
+    if not columns:
+        raise ValueError('columns cannot be empty!')
+
+    # check if data source already exists (by name)
+    data_source = mdl.DataSource.get_or_none(name = notnull(name))
+    if data_source:
+        return data_source
+
+    # create data source
+    data_source = mdl.DataSource.create(name = name)
+
+    # add timestamp (reserved) column
+    timestamp_column = mdl.Column.create(
+        name = ColumnTypes.TIMESTAMP.name,
+        column_type = 'timestamp',
+        is_categorical = False,
+    )
+    mdl.DataSourceColumn.create(data_source = data_source, column = timestamp_column)
+
+    # add columns (except reserved `timestamp` column)
+    for column in columns:
+        if column.name == ColumnTypes.TIMESTAMP.name:
+            continue   # skip reserved `timestamp` column (already added)
+        mdl.DataSourceColumn.create(data_source = data_source, column = column)
+
+    return data_source
+
+
+def add_campaign_data_source(
+    campaign: mdl.Campaign,
+    data_source: mdl.DataSource,
+) -> bool:
+    """
+    Adds a data source to campaign
+    :param campaign: the campaign to add data source to
+    :param data_source: data source being added
+    :return: whether data source has been added (false if already added)
+    """
+
+    if slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
+        return False
+
+    mdl.CampaignDataSource.create(campaign = campaign, data_source = data_source)
+    for participant in slc.get_campaign_participants(campaign):
+        wrappers.DataTable(participant, data_source).create_table()
+    return True
+
+
+def remove_campaign_data_source(
+    campaign: mdl.Campaign,
+    data_source: mdl.DataSource,
+):
+    """
+    Removes a data source from a campaign
+    :param campaign: the campaign to remove data source from
+    :param data_source: data source being removed
+    :return: None
+    """
+
+    if not slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
+        return
+
+    campaign_data_sources = mdl.CampaignDataSource.filter(
+        campaign = campaign,
+        data_source = data_source,
+    )
+    for campaign_data_source in campaign_data_sources:
+        campaign_data_source.delete_instance()
+
+
+# endregion
+
+# region column
 
 
 def create_column(
@@ -310,48 +381,43 @@ def create_column(
     )
 
 
-def create_data_source(
-    name: str,
-    columns: List[mdl.DataSourceColumn],
-) -> mdl.DataSource:
-    """
-    Creates a data source object in database and returns DataSource object
-    :param name: name of the data source
-    :param columns: list of columns of the data source
-    :return: DataSource object
-    """
+# endregion
 
-    # assert that name is not empty
-    if not name:
-        raise ValueError('Name cannot be empty!')
+# region hourly stats
 
-    # assert that columns are not empty
-    if not columns:
-        raise ValueError('columns cannot be empty!')
 
-    # check if data source already exists (by name)
-    data_source = mdl.DataSource.get_or_none(name = notnull(name))
-    if data_source:
-        return data_source
+def create_hourly_stats(
+    participant: mdl.Participant,
+    data_source: mdl.DataSource,
+    till_ts: datetime,
+    amounts: Dict[int, int],
+):
+    '''
+    Creates hourly stats for a participant
+    :param participant: participant of a campaign
+    :param data_source: data source of the data record
+    :param till_ts: timestamp till which stats are calculated
+    :param amounts: dict of amounts (key: column id, value: amount of data records)
+    '''
 
-    # create data source
-    data_source = mdl.DataSource.create(name = name)
+    # verify column ids are valid
+    column_ids = {column.id for column in slc.get_data_source_columns(data_source = data_source)}
+    for column_id in amounts.keys():
+        if column_id not in column_ids:
+            raise ValueError(f'Invalid column id: {column_id}')
 
-    # add timestamp (reserved) column
-    timestamp_column = mdl.Column.create(
-        name = ColumnTypes.TIMESTAMP.name,
-        column_type = 'timestamp',
-        is_categorical = False,
+    # create hourly stats
+    mdl.HourlyStats.create(
+        participant = participant,
+        data_source = data_source,
+        ts = till_ts,
+        amount = new_amount,
     )
-    mdl.DataSourceColumn.create(data_source = data_source, column = timestamp_column)
 
-    # add columns (except reserved `timestamp` column)
-    for column in columns:
-        if column.name == ColumnTypes.TIMESTAMP.name:
-            continue   # skip reserved `timestamp` column (already added)
-        mdl.DataSourceColumn.create(data_source = data_source, column = column)
 
-    return data_source
+# endregion
+
+# region raw data
 
 
 def create_data_record(
@@ -371,6 +437,10 @@ def create_data_record(
     # verify that content of `value` corresponds to data source columns
     columns = slc.get_data_source_columns(data_source = data_source)
     for column in columns:
+        # skip reserved `timestamp` column
+        if column.name == ColumnTypes.TIMESTAMP.name:
+            continue
+
         # column id must be in `value`
         if column.id not in value:
             raise ValueError(f'Column id {column.id} is missing in value!')
@@ -380,7 +450,7 @@ def create_data_record(
 
         # accept_values must be None or value must be in accept_values
         if column.accept_values is not None:
-            accept_values = [str.strip(x) for x in column.accept_values.split(',')]
+            accept_values = column.accept_values.split(',')
 
     wrappers.DataTable(participant = participant, data_source = data_source).insert(
         timestamp = timestamp,
@@ -426,35 +496,6 @@ def create_data_records(
         )
 
 
-def create_hourly_stats(
-    participant: mdl.Participant,
-    data_source: mdl.DataSource,
-    till_ts: datetime,
-    amounts: Dict[int, int],
-):
-    '''
-    Creates hourly stats for a participant
-    :param participant: participant of a campaign
-    :param data_source: data source of the data record
-    :param till_ts: timestamp till which stats are calculated
-    :param amounts: dict of amounts (key: column id, value: amount of data records)
-    '''
-
-    # verify column ids are valid
-    column_ids = {column.id for column in slc.get_data_source_columns(data_source = data_source)}
-    for column_id in amounts.keys():
-        if column_id not in column_ids:
-            raise ValueError(f'Invalid column id: {column_id}')
-
-    # create hourly stats
-    mdl.HourlyStats.create(
-        participant = participant,
-        data_source = data_source,
-        ts = till_ts,
-        amount = new_amount,
-    )
-
-
 def dump_data(
     participant: mdl.Participant,
     data_source: Optional[mdl.DataSource],
@@ -468,3 +509,6 @@ def dump_data(
 
     data_table = wrappers.DataTable(participant = participant, data_source = data_source)
     return data_table.dump_to_file()
+
+
+# endregion

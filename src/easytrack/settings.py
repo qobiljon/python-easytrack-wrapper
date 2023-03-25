@@ -3,6 +3,7 @@
 # stdlib
 from typing import Dict, Type
 from datetime import datetime
+from functools import cache
 
 POSRGRES_HOST: str = None
 POSTGRES_PORT: int = None
@@ -73,6 +74,7 @@ class ColumnTypes:
             ColumnTypes.FLOAT,
         ]
 
+    @cache
     @staticmethod
     def to_map() -> Dict[str, ColumnType]:
         ''' Returns a dictionary mapping string types to python types. '''

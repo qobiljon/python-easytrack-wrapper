@@ -1,6 +1,7 @@
 '''Wrappers for data tables and data records'''
 # pylint: disable=too-few-public-methods
 
+# stdlib
 from typing import Any, Dict, List, Optional
 from typing import OrderedDict, Union
 from datetime import timedelta
@@ -9,9 +10,11 @@ from abc import ABC
 import collections
 import pytz
 
+# 3rd party
 import psycopg2.extras as pg2_extras
 import psycopg2 as pg2
 
+# local
 from . import models as mdl
 from . import selectors as slc
 from .utils import notnull, get_temp_filepath, strip_tz
