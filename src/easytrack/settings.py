@@ -74,8 +74,8 @@ class ColumnTypes:
             ColumnTypes.FLOAT,
         ]
 
-    @cache
     @staticmethod
+    @cache
     def to_map() -> Dict[str, ColumnType]:
         ''' Returns a dictionary mapping string types to python types. '''
         return {column_type.name: column_type for column_type in ColumnTypes.all()}
