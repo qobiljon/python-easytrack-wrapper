@@ -392,7 +392,7 @@ def create_hourly_stats(
     participant: mdl.Participant,
     data_source: mdl.DataSource,
     hour_timestamp: datetime,
-    amount: Dict[int, int],
+    amount: Dict[int, Dict[int, int]],
 ):
     """
     Verifies column ids in `amount` and creates hourly stats at a given hour `hour_timestamp`
@@ -401,7 +401,9 @@ def create_hourly_stats(
     :param participant: participant of a campaign
     :param data_source: data source of the data record
     :param hour_timestamp: timestamp of the hour
-    :param amounts: dict of amounts (key: column id, value: amount of data records)
+    :param amounts: dict of amounts in following format: {column_id: {value: count}}
+                    where `column_id` is the integer id of the column, `value` is particular
+                    value of the column, and `count` is the number of records with that value.
     """
 
     # preprocess timestamp (i.e. round down to nearest hour)
