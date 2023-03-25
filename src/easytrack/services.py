@@ -3,6 +3,7 @@
 # stdlib
 from datetime import datetime
 from typing import Dict, List, Optional, Union
+import pytz
 
 # app
 from . import selectors as slc
@@ -71,6 +72,7 @@ def create_campaign(
     :param data_sources: list of data sources to be added to the campaign
     :return: Campaign object
     """
+    # pylint: disable=too-many-arguments
 
     # 0. validate the arguments
     today = datetime.today().replace(hour = 0, minute = 0, second = 0, microsecond = 0)
@@ -389,30 +391,42 @@ def create_column(
 def create_hourly_stats(
     participant: mdl.Participant,
     data_source: mdl.DataSource,
-    till_ts: datetime,
-    amounts: Dict[int, int],
+    hour_timestamp: datetime,
+    amount: Dict[int, int],
 ):
-    '''
-    Creates hourly stats for a participant
+    """
+    Verifies column ids in `amount` and creates hourly stats at a given hour `hour_timestamp`
+    for particular participant and data source. Note that the `hour_timestamp` is rounded down
+    to the nearest hour.
     :param participant: participant of a campaign
     :param data_source: data source of the data record
-    :param till_ts: timestamp till which stats are calculated
+    :param hour_timestamp: timestamp of the hour
     :param amounts: dict of amounts (key: column id, value: amount of data records)
-    '''
+    """
+
+    # preprocess timestamp (i.e. round down to nearest hour)
+    # (1) verify that timestamp is a datetime instance
+    if not isinstance(hour_timestamp, datetime):
+        raise ValueError('`hour_timestamp` must be a datetime object!')
+    # (2) remove timezone info (first convert to UTC, then remove timezone info)
+    hour_timestamp = hour_timestamp.astimezone(tz = pytz.utc)
+    hour_timestamp = hour_timestamp.replace(tzinfo = None)
+    # (3) round down to nearest hour
+    hour_timestamp = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0)
 
     # verify column ids are valid
     column_ids = {column.id for column in slc.get_data_source_columns(data_source = data_source)}
-    for column_id in amounts.keys():
+    for column_id in amount.keys():
         if column_id not in column_ids:
             raise ValueError(f'Invalid column id: {column_id}')
 
-    # create hourly stats
-    mdl.HourlyStats.create(
+    # create hourly stats (i.e. insert into database)
+    mdl.HourlyStats.insert(
         participant = participant,
         data_source = data_source,
-        ts = till_ts,
-        amount = new_amount,
-    )
+        timestamp = hour_timestamp,
+        amount = amount,
+    ).execute()
 
 
 # endregion
@@ -434,24 +448,7 @@ def create_data_record(
     :param value: value of the data record (dict of column id and value)
     """
 
-    # verify that content of `value` corresponds to data source columns
-    columns = slc.get_data_source_columns(data_source = data_source)
-    for column in columns:
-        # skip reserved `timestamp` column
-        if column.name == ColumnTypes.TIMESTAMP.name:
-            continue
-
-        # column id must be in `value`
-        if column.id not in value:
-            raise ValueError(f'Column id {column.id} is missing in value!')
-
-        # verify that value is of correct type
-        ColumnTypes.from_str(column.column_type).verify_value(value[column.id])
-
-        # accept_values must be None or value must be in accept_values
-        if column.accept_values is not None:
-            accept_values = column.accept_values.split(',')
-
+    # NOTE: verification is already done in wrappers.DataTable.insert() function
     wrappers.DataTable(participant = participant, data_source = data_source).insert(
         timestamp = timestamp,
         value = value,
@@ -473,6 +470,7 @@ def create_data_records(
     :return: None
     """
 
+    # NOTE: verification is already done in wrappers.DataTable.insert() function
     data_sources: Dict[int, mdl.DataSource] = {}   # dict()
     for timestamp, data_source_id, value in zip(timestamps, data_source_ids, values):
 

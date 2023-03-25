@@ -741,7 +741,6 @@ class DataTableTestCase(BaseTestCase):
 
         self.cleanup()
 
-    #@skip("amount is computed by background service in latest versions")
     def test_amount(self):
         '''Test that the amount of data is correctly computed.'''
 
@@ -756,17 +755,15 @@ class DataTableTestCase(BaseTestCase):
 
         # prepare dummy datapoints
         columns = slc.get_data_source_columns(data_source = data_source)
-        data_point = {
+        tmp = {
             ColumnTypes.TIMESTAMP.name: None,
             ColumnTypes.TEXT.name: 'dummy',
             ColumnTypes.INTEGER.name: 7,
             ColumnTypes.FLOAT.name: 3.5,
         }
+        data_point_value = {}
         for column in columns:
-            if column.name == ColumnTypes.TIMESTAMP.name:
-                continue
-            elif column.name == ColumnTypes.TEXT.name:
-                data_point[column.id] = randint(0, 100)
+            data_point_value[column.id] = tmp[column.column_type]
 
         # add participant to campaign
         user = self.new_user('participant')
@@ -794,7 +791,7 @@ class DataTableTestCase(BaseTestCase):
             participant = participant,
             data_source = data_source,
             timestamp = now_ts,
-            value = data_point,
+            value = data_point_value,
         )
 
         # verify amount of data
@@ -813,7 +810,7 @@ class DataTableTestCase(BaseTestCase):
             participant = participant,
             data_source_ids = [data_source.id]*random_amount,
             timestamps = [ts_now + timedelta(seconds = x) for x in range(random_amount)],
-            values = [data_point]*random_amount,
+            values = [data_point_value]*random_amount,
         )
 
         # verify amount of data
@@ -855,16 +852,21 @@ class DataTableTestCase(BaseTestCase):
         self.assertIsNone(data.select_first_ts())
         self.assertIsNone(data.select_last_ts())
 
-        # prepare dummy value
-        value = {
+        # prepare dummy datapoints
+        columns = slc.get_data_source_columns(data_source = data_source)
+        tmp = {
+            ColumnTypes.TIMESTAMP.name: None,
             ColumnTypes.TEXT.name: 'dummy',
-            ColumnTypes.INTEGER.name: 3,
-            ColumnTypes.FLOAT.name: 1.5,
+            ColumnTypes.INTEGER.name: 7,
+            ColumnTypes.FLOAT.name: 3.5,
         }
+        data_point_value = {}
+        for column in columns:
+            data_point_value[column.id] = tmp[column.column_type]
 
         # insert data and check amounts
-        data.insert(timestamp = now_ts, value = value)
-        data.insert(timestamp = now_ts + timedelta(seconds = 1), value = value)
+        data.insert(timestamp = now_ts, value = data_point_value)
+        data.insert(timestamp = now_ts + timedelta(seconds = 1), value = data_point_value)
         self.assertEqual(
             data.select_count(
                 from_ts = now_ts.replace(year = now_ts.year - 1),
@@ -913,18 +915,18 @@ class HourlyStatsTestcase(BaseTestCase):
             amount[column.id] = {'value': 1}
 
         # update hourly stats table (add one data point)
-        mdl.HourlyStats.insert(
+        svc.create_hourly_stats(
             participant = participant,
             data_source = data_source,
-            timestamp = now_ts.replace(minute = 0, second = 0, microsecond = 0),
+            hour_timestamp = now_ts.replace(minute = 0, second = 0, microsecond = 0),
             amount = amount,
-        ).execute()
+        )
 
         # verify amount of data with get_filtered_amount_of_data
         tmp = slc.get_hourly_amount_of_data(
             participant = participant,
             data_source = data_source,
-            hour_timestamp = now_ts,
+            hour_timestamp = now_ts.replace(minute = 0, second = 0, microsecond = 0),
         )
         for column in columns:
             self.assertTrue(all(x == 1 for x in tmp[column].values()))
@@ -954,24 +956,24 @@ class HourlyStatsTestcase(BaseTestCase):
         for column in columns:
             amount[column.id] = {'value': time0_amount}
         # update hourly stats table (add one data point)
-        mdl.HourlyStats.insert(
+        svc.create_hourly_stats(
             participant = participant,
             data_source = data_source,
-            timestamp = time0,
+            hour_timestamp = time0,
             amount = amount,
-        ).execute()
+        )
 
         # add amounts at time1
         amount: Dict[int, Dict[str, int]] = {}
         for column in columns:
             amount[column.id] = {'value': time1_amount}
         # update hourly stats table (add one data point)
-        mdl.HourlyStats.insert(
+        svc.create_hourly_stats(
             participant = participant,
             data_source = data_source,
-            timestamp = time1,
+            hour_timestamp = time1,
             amount = amount,
-        ).execute()
+        )
 
         # verify before time0 (should be empty)
         tmp = slc.get_hourly_amount_of_data(

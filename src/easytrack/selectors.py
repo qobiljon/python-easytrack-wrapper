@@ -3,6 +3,7 @@
 # stdlib
 from typing import List, Dict, Optional
 from datetime import datetime
+import pytz
 
 # local
 from . import models
@@ -228,12 +229,24 @@ def get_hourly_amount_of_data(
     hour_timestamp: datetime,
 ) -> Dict[models.Column, int]:
     """
-    Computes and returns the amount of data during specified period
+    Returns dictionary with the amount of data for each column of a data source
+    at a given hour `hour_timestamp` for particular participant and data source.
+    Note that `hour_timestamp` is rounded down to the nearest hour.
     :param participant: participant being queried
     :param data_source: data source being queried
     :param hour_timestamp: timestamp of the hour being queried
     :return: dictionary with the amount of data for each column
     """
+
+    # preprocess timestamp (i.e. round down to nearest hour)
+    # (1) verify that timestamp is a datetime instance
+    if not isinstance(hour_timestamp, datetime):
+        raise TypeError("`hour_timestamp` must be a datetime instance")
+    # (2) remove timezone info (first convert to UTC, then remove timezone info)
+    hour_timestamp = hour_timestamp.astimezone(tz = pytz.utc)
+    hour_timestamp = hour_timestamp.replace(tzinfo = None)
+    # (3) round down to nearest hour
+    hour_timestamp = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0)
 
     # prepare the dictionary with the amount of data for each column
     data_source_columns = get_data_source_columns(data_source = data_source)

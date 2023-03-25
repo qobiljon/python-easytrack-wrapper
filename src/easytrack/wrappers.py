@@ -23,16 +23,31 @@ from .settings import ColumnTypes
 
 
 class DataRecord:
-    '''Data record wrapper'''
+    """
+    Data record (sample) wrapper. Stores a single data record (sample) for a
+    participant and data source. The data record is a dictionary of column names
+    and values. The timestamp is stored separately as it is used for indexing
+    and fast lookup.
+    """
 
-    def __init__(self, data_source: mdl.DataSource, timestamp: datetime, value: Any):
+    def __init__(
+        self,
+        data_source: mdl.DataSource,
+        timestamp: datetime,
+        value: Dict[int, Any],
+    ):
         self.data_source: mdl.DataSource = notnull(data_source)
         self.timestamp: datetime = notnull(strip_tz(timestamp))
-        self.value: Dict = notnull(value)
+        self.value: Dict[int, Any] = notnull(value)
 
 
 class Connections:
-    '''Connection pool for postgresql'''
+    """
+    Connection pool for postgresql. This is a singleton class that maintains a
+    pool of connections to postgresql. The pool is a dictionary of connections
+    where the key is the schema name. The connections are created on demand and
+    are closed when the application exits.
+    """
     __connections: Dict[str, pg2_extras.DictConnection] = {}   # dict()
 
     @staticmethod
@@ -66,7 +81,11 @@ class Connections:
 
 
 class BaseDataTableWrapper(ABC):
-    '''Base data table wrapper'''
+    """
+    Base data table wrapper. This is an abstract base class for data table
+    wrappers. It provides common functionality for all data table wrappers
+    such as creating and dropping tables (for raw and aggregated data).
+    """
 
     def __init__(
         self,
@@ -187,16 +206,19 @@ class BaseDataTableWrapper(ABC):
         commit: bool = True,
     ):
         """
-        Inserts a data record into a data table for a participant and data source
+        Upon insertion, value is validated against the data source column constraints.
+        Inserts a data record into a data table for a participant and data source.
         :param timestamp: timestamp of the data record
         :param value: value of the data record
         :param commit: whether to commit the changes to database
         """
         # pylint: disable=too-many-locals
 
-        # verify that `value` is a dictionary
-        if not isinstance(value, dict):
-            raise ValueError('value must be a dictionary!')
+        # verify parameter types and that they are not None
+        parameters = [(timestamp, datetime), (value, dict)]
+        for param, param_type in parameters:
+            if not isinstance(param, param_type):
+                raise ValueError(f'Parameter {param} is not of type {param_type}')
 
         # verify the types and constraints of provided values
         for column in self.columns:
@@ -206,12 +228,12 @@ class BaseDataTableWrapper(ABC):
                 continue
 
             # verify that column is present in value
-            if column.name not in value:
-                raise ValueError(f'Column {column.name} is missing in value')
+            if column.id not in value:
+                raise ValueError(f'Column {column.id} is missing in value')
 
             # verify that column type is correct
             col_pytype = settings.ColumnTypes.from_str(column.column_type).py_type
-            if not isinstance(value[column.name], col_pytype):
+            if not isinstance(value[column.id], col_pytype):
                 raise ValueError(f'Column {column.name} has incorrect type')
 
             # assert that provided value complies with column constraints
@@ -232,10 +254,13 @@ class BaseDataTableWrapper(ABC):
         column_names_arr = []   # e.g. ['col1', 'col2', 'col3']
         column_values_arr = []   # e.g. ['val1', 'val2', 'val3']
         for column in self.columns:
+
+            # skip `timestamp` as it is added separately later
             if column.name == ColumnTypes.TIMESTAMP.name:
-                continue   # skip `timestamp` as it is added separately later
+                continue
+
             column_names_arr.append(column.name)
-            column_values_arr.append(value[column.name])
+            column_values_arr.append(value[column.id])
 
         # merge columns part of sql query into a single string
         # e.g. ['col1', 'col2', 'col3'] -> 'col1, col2, col3'
@@ -438,10 +463,17 @@ class BaseDataTableWrapper(ABC):
 
 
 class DataTable(BaseDataTableWrapper):
-    '''Data table wrapper for a specific participant and data source'''
+    """
+    Data table wrapper for a specific participant and data source. This class provides
+    wrapper methods over SQL queries to manipulate data in the tables (similar to
+    Object-Relational Mapping).
+    """
 
     def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
         super().__init__(participant = participant, data_source = data_source)
+
+        # raw data table name in `c{campaign_id}u{user_id}d{data_source_id}` format
+        # e.g. c1u1d1 -> campaign 1, user 1, data source 1
         self.table_name = f'c{participant.campaign.id}u{participant.user.id}d{data_source.id}'
 
     def select_count(self, from_ts: datetime, till_ts: datetime) -> int:
@@ -499,10 +531,17 @@ class DataTable(BaseDataTableWrapper):
 
 
 class AggDataTable(BaseDataTableWrapper):
-    '''Aggregated data table wrapper for a specific participant and data source'''
+    """
+    Aggregated data table wrapper for a specific participant and data source. This class provides
+    wrapper methods over SQL queries to manipulate data in the tables (similar to Object-Relational
+    Mapping).
+    """
 
     def __init__(self, participant: mdl.Participant, data_source: mdl.DataSource):
         super().__init__(participant = participant, data_source = data_source)
+
+        # table name in `c{campaign_id}u{user_id}d{data_source_id}_aggregated` format
+        # e.g. c1u1d1_aggregated -> campaign 1, user 1, data source 1 (aggregated data)
         self.table_name = ''.join([
             f'c{participant.campaign.id}',
             f'u{participant.user.id}',
@@ -512,7 +551,10 @@ class AggDataTable(BaseDataTableWrapper):
 
 
 class DataSourceStats:
-    '''Data source statistics such as amount of samples and last sync time'''
+    """
+    Data source statistics class provides a pythonic interface to access data source statistics
+    such as amount of data and last sync time (of a particular participant and data source)
+    """
 
     def __init__(
         self,
@@ -520,12 +562,16 @@ class DataSourceStats:
         amount_of_samples: Optional[int] = None,
         last_sync_time: Optional[datetime] = None,
     ):
+        # set default values
         if not amount_of_samples:
             amount_of_samples = 0
-
         if not last_sync_time:
             last_sync_time = datetime.fromtimestamp(0)
-        last_sync_time = last_sync_time.astimezone(tz = pytz.utc).replace(tzinfo = None)
+
+        # remove timezone info from last_sync_time
+        # (1) change it to UTC, (2) then remove it
+        last_sync_time = last_sync_time.astimezone(tz = pytz.utc)
+        last_sync_time = last_sync_time.replace(tzinfo = None)
 
         self.data_source: mdl.DataSource = data_source
         self.amount_of_samples: int = amount_of_samples
@@ -533,7 +579,10 @@ class DataSourceStats:
 
 
 class ParticipantStats:
-    '''Participant statistics such as amount of data and last sync time'''
+    """
+    Participant statistics class provides a pythonic interface to access participant statistics
+    such as amount of data and last sync time (of a particular participant).
+    """
 
     def __init__(self, participant: mdl.Participant):
         self.participant: mdl.Participant = notnull(participant)
