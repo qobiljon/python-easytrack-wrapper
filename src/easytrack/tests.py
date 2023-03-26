@@ -9,6 +9,7 @@ from datetime import datetime
 from datetime import timedelta
 from random import randint
 from os import getenv
+import pytz
 
 # 3rd party
 from dotenv import load_dotenv
@@ -119,8 +120,8 @@ class BaseTestCase(TestCase):
             owner = user,
             name = 'dummy',
             description = None,
-            start_ts = datetime.now(),
-            end_ts = datetime.now() + timedelta(days = 1),
+            start_ts = datetime.now(tz = pytz.utc),
+            end_ts = datetime.now(tz = pytz.utc) + timedelta(days = 1),
             data_sources = [],
         )
 
@@ -227,8 +228,8 @@ class CampaignTestCase(BaseTestCase):
             owner = owner_user,
             name = 'dummy',
             description = None,
-            start_ts = datetime.now(),
-            end_ts = datetime.now() + timedelta(days = 1),
+            start_ts = datetime.now(tz = pytz.utc),
+            end_ts = datetime.now(tz = pytz.utc) + timedelta(days = 1),
             data_sources = [],
         )
         self.assertIsInstance(campaign, mdl.Campaign)
@@ -775,7 +776,7 @@ class DataTableTestCase(BaseTestCase):
         self.assertIsNotNone(participant)   # check that participant was added
 
         # verify that there is no data (yet)
-        now_ts = datetime.now()
+        now_ts = datetime.now(tz = pytz.utc)
         from_ts = now_ts.replace(year = now_ts.year - 1)
         till_ts = now_ts.replace(year = now_ts.year + 1)
         self.assertEqual(
@@ -805,7 +806,7 @@ class DataTableTestCase(BaseTestCase):
 
         # add more data (random amount)
         random_amount = randint(2, 10)
-        ts_now = datetime.now()
+        ts_now = datetime.now(tz = pytz.utc)
         svc.create_data_records(
             participant = participant,
             data_source_ids = [data_source.id]*random_amount,
@@ -900,7 +901,7 @@ class HourlyStatsTestcase(BaseTestCase):
         columns = [x for x in columns if x.name != ColumnTypes.TIMESTAMP.name]
 
         # verify that there is no data (yet)
-        now_ts = datetime.now()
+        now_ts = datetime.now(tz = pytz.utc)
         tmp = slc.get_hourly_amount_of_data(
             participant = participant,
             data_source = data_source,
@@ -945,10 +946,13 @@ class HourlyStatsTestcase(BaseTestCase):
         columns = [x for x in columns if x.name != ColumnTypes.TIMESTAMP.name]
 
         # prepare edge case timestamps
-        tmp = datetime.now().replace(minute = 0, second = 0, microsecond = 0)
-        time0 = tmp - timedelta(days = 1)   # yesterday this time
+        cur_hour_dt = datetime.now(tz = pytz.utc)
+        cur_hour_dt = cur_hour_dt.replace(minute = 0, second = 0, microsecond = 0)
+        # previous hour
+        time0 = cur_hour_dt - timedelta(hours = 1)
         time0_amount = 1
-        time1 = time0 + timedelta(hours = 1)   # yesterday this time + 1 hour (later)
+        # this hour
+        time1 = cur_hour_dt
         time1_amount = 2
 
         # add amounts at time0
@@ -1034,9 +1038,11 @@ class HourlyStatsTestcase(BaseTestCase):
         columns = [x for x in columns if x.name != ColumnTypes.TIMESTAMP.name]
 
         # prepare two timestamps and corresponding amounts
+        latest_dt = datetime.now(tz = pytz.utc)
+        latest_amount = 2
         tmp = [
-            (datetime.now() - timedelta(hours = 1), 1),
-            (datetime.now(), 2),
+            (latest_dt - timedelta(hours = 1), latest_amount - 1),
+            (latest_dt, latest_amount),
         ]
         # create the two `models.HourlyStats` instances
         for timestamp, dummy_count in tmp:
@@ -1053,9 +1059,12 @@ class HourlyStatsTestcase(BaseTestCase):
             )
 
         # verify amount of data with get_latest_hourly_stats
-        tmp = slc.get_latest_hourly_amount(
+        timestamp, amount = slc.get_latest_hourly_amount(
             participant = participant,
             data_source = data_source,
         )
+        # verify timestamp
+        self.assertEqual(timestamp, latest_dt.replace(minute = 0, second = 0, microsecond = 0))
+        # verify amount
         for column in columns:
-            self.assertTrue(all(x == 2 for x in tmp[column].values()))
+            self.assertTrue(all(x == latest_amount for x in amount[column].values()))

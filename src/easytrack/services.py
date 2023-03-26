@@ -74,16 +74,22 @@ def create_campaign(
     """
     # pylint: disable=too-many-arguments
 
-    # 0. validate the arguments
-    today = datetime.today().replace(hour = 0, minute = 0, second = 0, microsecond = 0)
-    if start_ts < today:
-        raise ValueError('"start_ts" cannot be in the past!')
-    if end_ts <= start_ts:
-        raise ValueError('"start_ts" must be before "end_ts"!')
-    if (end_ts - start_ts).days < 1:
-        raise ValueError("study duration must be at least one day.")
+    # only pytz.UTC is supported
+    if start_ts.tzinfo != pytz.utc:
+        raise ValueError('"start_ts" must be in UTC!')
+    if end_ts.tzinfo != pytz.utc:
+        raise ValueError('"end_ts" must be in UTC!')
 
-    # 1. create a campaign
+    # verify `start_ts` and `end_ts` parameters
+    today = datetime.now(tz = pytz.utc).date()
+    if start_ts.date() < today:
+        raise ValueError('"start_ts" must be in the future!')
+    if end_ts.date() <= start_ts.date():
+        raise ValueError('"end_ts" must be after "start_ts"!')
+    if (end_ts.date() - start_ts.date()).days < 1:
+        raise ValueError('"end_ts" must be at least 1 day after "start_ts"!')
+
+    # create campaign
     campaign = mdl.Campaign.create(
         owner = notnull(owner),
         name = notnull(name),
@@ -92,14 +98,15 @@ def create_campaign(
         end_ts = end_ts,
     )
 
-    # 2. add owner as a supervisor
+    # create supervisor (campaign owner)
     mdl.Supervisor.create(campaign = campaign, user = owner)
 
-    # 3. add campaign's data sources
+    # add campaign data sources
     if data_sources:
         for data_source in data_sources:
             add_campaign_data_source(campaign = campaign, data_source = data_source)
 
+    # return the campaign instance
     return campaign
 
 
@@ -122,18 +129,28 @@ def update_campaign(
     :return: None
     """
 
+    # only pytz.UTC is supported
+    if start_ts.tzinfo != pytz.utc:
+        raise ValueError('"start_ts" must be in UTC!')
+    if end_ts.tzinfo != pytz.utc:
+        raise ValueError('"end_ts" must be in UTC!')
+
+    # verify null-ness of parameters (except `description`) and update campaign
     campaign: mdl.Campaign = notnull(supervisor).campaign
     campaign.name = notnull(name)
     campaign.start_ts = notnull(start_ts)
     campaign.end_ts = notnull(end_ts)
     campaign.save()
 
+    # resolve data source differences - determine which data sources to add and remove
     prev_data_sources = set(slc.get_campaign_data_sources(campaign = campaign))
     cur_data_sources = set(data_sources)
 
+    # remove excluded data sources
     for prev_data_source in prev_data_sources.difference(cur_data_sources):
         remove_campaign_data_source(campaign = campaign, data_source = prev_data_source)
 
+    # add new data sources
     for new_data_source in cur_data_sources.difference(prev_data_sources):
         add_campaign_data_source(campaign = campaign, data_source = new_data_source)
 
@@ -425,14 +442,11 @@ def create_hourly_stats(
                     value of the column, and `count` is the number of records with that value.
     """
 
-    # preprocess timestamp (i.e. round down to nearest hour)
-    # (1) verify that timestamp is a datetime instance
+    # verify and preprocess hour_timestamp
     if not isinstance(hour_timestamp, datetime):
         raise ValueError('`hour_timestamp` must be a datetime object!')
-    # (2) remove timezone info (first convert to UTC, then remove timezone info)
-    hour_timestamp = hour_timestamp.astimezone(tz = pytz.utc)
-    hour_timestamp = hour_timestamp.replace(tzinfo = None)
-    # (3) round down to nearest hour
+    if hour_timestamp.tzinfo != pytz.utc:
+        raise ValueError('`hour_timestamp` must be in UTC!')
     hour_timestamp = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0)
 
     # verify column ids are valid
@@ -485,6 +499,10 @@ def create_data_record(
                     converted to JSON when stored in the database.
     """
 
+    # verify timestamp utc-ness
+    if timestamp.tzinfo != pytz.utc:
+        raise ValueError('`timestamp` must be in UTC!')
+
     # NOTE: verification is already done in wrappers.DataTable.insert() function
     wrappers.DataTable(participant = participant, data_source = data_source).insert(
         timestamp = timestamp,
@@ -509,6 +527,11 @@ def create_data_records(
                         of the column. Note that the `column_id` is a string because it is
                         converted to JSON when stored in the database.
     """
+
+    # verify that timestamps are in UTC
+    for timestamp in timestamps:
+        if timestamp.tzinfo != pytz.utc:
+            raise ValueError('all `timestamp`s must be in UTC!')
 
     # NOTE: verification is already done in wrappers.DataTable.insert() function
     data_sources: Dict[int, mdl.DataSource] = {}   # dict()

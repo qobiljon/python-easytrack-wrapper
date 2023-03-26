@@ -1,7 +1,7 @@
 ''' Read operations / queries to easytrack's `core` and `data` tables. '''
 
 # stdlib
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import pytz
 
@@ -244,14 +244,11 @@ def get_hourly_amount_of_data(
     :return: dictionary with the amount of data for each column of a data source
     """
 
-    # preprocess timestamp (i.e. round down to nearest hour)
-    # (1) verify that timestamp is a datetime instance
+    # verify and preprocess timestamp
     if not isinstance(hour_timestamp, datetime):
         raise TypeError("`hour_timestamp` must be a datetime instance")
-    # (2) remove timezone info (first convert to UTC, then remove timezone info)
-    hour_timestamp = hour_timestamp.astimezone(tz = pytz.utc)
-    hour_timestamp = hour_timestamp.replace(tzinfo = None)
-    # (3) round down to nearest hour
+    if hour_timestamp.tzinfo != pytz.utc:
+        raise ValueError("`hour_timestamp` must be a UTC datetime")
     hour_timestamp = hour_timestamp.replace(minute = 0, second = 0, microsecond = 0)
 
     # prepare the dictionary with the amount of data for each column
@@ -330,57 +327,59 @@ def get_hourly_amount_of_data(
 def get_latest_hourly_amount(
     participant: models.Participant,
     data_source: models.DataSource,
-) -> Dict[models.Column, Dict[str, int]]:
+) -> Tuple[datetime, Dict[models.Column, Dict[str, int]]]:
     """
     Returns dictionary with the amount of data for each column of a data source
     at the latest hour for particular participant and data source.
     :param `participant`: participant being queried
     :param `data_source`: data source being queried
-    :return: dictionary with the amount of data for each column of a data source,
-             may be empty if no `models.HourlyStats` exist yet
+    :return: tuple with the latest hour timestamp and dictionary with the amount
+                of data for each column of a data source at the latest. Can return
+                None if no prior hourly stats exist for the participant and data
+                source.
     """
 
     # get the latest hourly stats
-    stats = models.HourlyStats.filter(
+    hourly_stats = models.HourlyStats.filter(
         participant = participant,
         data_source = data_source,
     ).order_by(models.HourlyStats.timestamp.desc()).limit(1).execute()
-    stats = next(iter(stats), None)
+    hourly_stats = next(iter(hourly_stats), None)
 
     # if hourly stats exist, return the amount of data for each column
-    if stats:
+    if hourly_stats:
         # no-op: for linting purposes only
-        stats: models.HourlyStats = stats
+        hourly_stats: models.HourlyStats = hourly_stats
 
         # json stores column ids as strings (not integers)
         # so we need to convert them back for lookup by column id (int)
-        amounts = {int(k): v for k, v in dict(stats.amount).items()}
+        tmp = {int(k): v for k, v in dict(hourly_stats.amount).items()}
 
         # get data source columns
         data_source_columns = get_data_source_columns(data_source = data_source)
 
         # prepare the dictionary with the amount of data for each column
-        ans: Dict[models.Column, Dict[str, int]] = {}
+        amount: Dict[models.Column, Dict[str, int]] = {}
         for data_source_column in data_source_columns:
 
-            # skip timestamp column
+            # skip timestamp column (no need to update it)
             if data_source_column.name == ColumnTypes.TIMESTAMP.name:
                 continue
 
             # if column is not in the stats, skip it
-            if data_source_column.id not in amounts:
+            if data_source_column.id not in tmp:
                 # new value for column was added after the stats were computed
                 # (categorical column)
                 continue
 
             # if column has constraints, update the dictionary
-            ans[data_source_column] = amounts[data_source_column.id]
+            amount[data_source_column] = tmp[data_source_column.id]
 
         # return the amount of data for each column
-        return ans
+        return pytz.utc.localize(hourly_stats.timestamp), amount
 
-    # if no hourly stats exist, return empty dictionary
-    return {}
+    # if no hourly stats exist, return (None, None) tuple
+    return None
 
 
 # endregion
