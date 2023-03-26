@@ -22,10 +22,10 @@ def create_user(
 ) -> mdl.User:
     """
     Creates a user object in database and returns User object
-    :param email: email of the user
-    :param name: name of the user
-    :param session_key: session key of the user
-    :return: User object
+    :param `email`: email (string) of the user, must be unique
+    :param `name`: name (string) of the user
+    :param `session_key`: session key (string) of the user, unique
+    :return: a `models.User` object
     """
 
     return mdl.User.create(
@@ -41,8 +41,8 @@ def set_user_session_key(
 ):
     """
     Sets a new session key for a user
-    :param user: user object to be modified
-    :param new_session_key: new session key
+    :param `user`: user object to be modified
+    :param `new_session_key`: new session key
     :return: None
     """
 
@@ -64,13 +64,13 @@ def create_campaign(
     data_sources: Optional[List[mdl.DataSource]],
 ) -> mdl.Campaign:
     """
-    Creates a campaign object in database and returns Campaign object
-    :param owner: owner of the campaign
-    :param name: name of the campaign
-    :param start_ts: start timestamp of the campaign
-    :param end_ts: end timestamp of the campaign
-    :param data_sources: list of data sources to be added to the campaign
-    :return: Campaign object
+    Creates a campaign object in database and returns Campaign (py) instance
+    :param `owner`: owner of the campaign (`models.User` object)
+    :param `name`: name (string) of the campaign
+    :param `start_ts`: start timestamp (datetime) of the campaign
+    :param `end_ts`: end timestamp (datetime) of the campaign
+    :param `data_sources`: list of data sources to be added to the campaign
+    :return: a `models.Campaign` object
     """
     # pylint: disable=too-many-arguments
 
@@ -111,12 +111,14 @@ def update_campaign(
     data_sources: List[mdl.DataSource],
 ):
     """
-    Updates a campaign
-    :param supervisor: supervisor of the campaign (includes reference to user and campaign)
-    :param name: new name of the campaign
-    :param start_ts: new start timestamp of the campaign
-    :param end_ts: new end timestamp of the campaign
-    :param data_sources: new list of data sources to be added to the campaign
+    Updates a campaign properties in database. Data sources are either added or removed
+    according to the difference between the previous and current data sources.
+    :param `supervisor`: supervisor of the campaign (includes reference to
+                         `user` and `campaign`)
+    :param `name`: updated name (string) of the campaign
+    :param `start_ts`: updated start timestamp (datetime) of the campaign
+    :param `end_ts`: updated end timestamp (datetime) of the campaign
+    :param `data_sources`: updated list of data sources of the campaign
     :return: None
     """
 
@@ -138,9 +140,9 @@ def update_campaign(
 
 def delete_campaign(supervisor: mdl.Supervisor):
     """
-    Deletes a campaign
-    :param supervisor: supervisor of the campaign (includes reference to user and campaign)
-    :return: None
+    Deletes a campaign from database.
+    :param `supervisor`: supervisor of the campaign (includes reference to
+                            `user` and `campaign`)
     """
 
     campaign: mdl.Campaign = notnull(supervisor).campaign
@@ -158,10 +160,13 @@ def add_campaign_participant(
     add_user: mdl.User,
 ) -> bool:
     """
-    Binds user with campaign, making a participant.
-    :param add_user: User object to be bound to a campaign
-    :param campaign: Campaign object that user binds with
-    :return: whether user has been bound (false if already bound)
+    Adds a participant to a campaign. If the user is already a participant of the campaign,
+    this function does nothing and returns False. Otherwise, it creates a new participant
+    and returns True.
+    :param `add_user`: user (`models.User`) to be added to the campaign
+    :param `campaign`: campaign (`models.Campaign`) to which the user is to be added
+    :return: `True` if the user was added to the campaign, `False` otherwise (i.e. already
+                a participant)
     """
 
     if slc.is_participant(user = notnull(add_user), campaign = notnull(campaign)):
@@ -188,10 +193,14 @@ def add_supervisor_to_campaign(
     new_user: mdl.User,
 ) -> bool:
     """
-    Binds user with campaign, making a supervisor.
-    :param new_user: User object to be bound to a campaign
-    :param supervisor: Supervisor object that user binds with
-    :return: whether user has been bound (false if already bound)
+    Adds a supervisor to a campaign. If the user is already a supervisor of the campaign,
+    this function does nothing and returns False. Otherwise, it creates a new supervisor
+    and returns True.
+    :param `new_user`: user (`models.User`) to be added to the campaign as a supervisor
+    :param `supervisor`: supervisor (`models.Supervisor`) of the campaign for checking
+                            permissions (i.e. only a supervisor can add another supervisor)
+    :return: `True` if the user was added to the campaign as a supervisor, `False` otherwise
+                (i.e. already a supervisor)
     """
 
     campaign: mdl.Campaign = notnull(supervisor).campaign
@@ -205,9 +214,10 @@ def add_supervisor_to_campaign(
 
 def remove_supervisor_from_campaign(old_supervisor: mdl.Supervisor):
     """
-    Removes a supervisor from a campaign
-    :param old_supervisor: Supervisor object to be removed
-    :return: None
+    Removes a supervisor from a campaign. If the user is the owner of the campaign, this
+    function does nothing. Otherwise, it removes the supervisor from the campaign.
+    :param `old_supervisor`: supervisor (`models.Supervisor`) to be removed from the
+                                campaign
     """
 
     campaign: mdl.Campaign = notnull(old_supervisor).campaign
@@ -225,10 +235,11 @@ def create_data_source(
     columns: List[mdl.DataSourceColumn],
 ) -> mdl.DataSource:
     """
-    Creates a data source object in database and returns DataSource object
-    :param name: name of the data source
-    :param columns: list of columns of the data source
-    :return: DataSource object
+    Creates a data source in database. If a data source with the same name already exists,
+    it returns the existing data source.
+    :param `name`: name (string) of the data source (e.g. 'location', 'accelerometer')
+    :param `columns`: list of columns (`models.DataSourceColumn`) of the data source
+    :return: data source (`models.DataSource`) created in database
     """
 
     # assert that name is not empty
@@ -269,10 +280,13 @@ def add_campaign_data_source(
     data_source: mdl.DataSource,
 ) -> bool:
     """
-    Adds a data source to campaign
-    :param campaign: the campaign to add data source to
-    :param data_source: data source being added
-    :return: whether data source has been added (false if already added)
+    Adds a data source to a campaign. If the data source is already added to the campaign,
+    this function does nothing and returns False. Otherwise, it creates a new data source
+    and returns True.
+    :param `campaign`: campaign (`models.Campaign`) to which the data source is to be added
+    :param `data_source`: data source (`models.DataSource`) to be added to the campaign
+    :return: `True` if the data source was added to the campaign, `False` otherwise (i.e.
+                already added)
     """
 
     if slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
@@ -289,10 +303,11 @@ def remove_campaign_data_source(
     data_source: mdl.DataSource,
 ):
     """
-    Removes a data source from a campaign
-    :param campaign: the campaign to remove data source from
-    :param data_source: data source being removed
-    :return: None
+    Removes a data source from a campaign. If the data source is not added to the campaign,
+    this function does nothing. Otherwise, it removes the data source from the campaign.
+    :param `campaign`: campaign (`models.Campaign`) from which the data source is to be
+                        removed
+    :param `data_source`: data source (`models.DataSource`) to be removed from the campaign
     """
 
     if not slc.is_campaign_data_source(campaign = campaign, data_source = data_source):
@@ -318,12 +333,15 @@ def create_column(
     accept_values: Optional[str],
 ) -> mdl.Column:
     """
-    Creates a column object in database and returns Column object
-    :param name: name of the column
-    :param type: type of the column (e.g. float, string)
-    :param is_categorical: whether the column is categorical
-    :param accept_values: comma-separated list of accepted values
-    :return: Column object
+    Creates a column in database. If a column with the same name already exists, it returns
+    the existing column.
+    :param `name`: name (string) of the column (e.g. 'latitude', 'acceleration')
+    :param `column_type`: type (string) of the column (e.g. 'float', 'text') (see
+                            `models.ColumnTypes`)
+    :param `is_categorical`: whether the column is categorical (boolean)
+    :param `accept_values`: list of accepted values (string) for the column (e.g. '1,2,3') or
+                            `None` if the column accepts all values
+    :return: column (`models.Column`) created in database
     """
     # pylint: disable=too-many-branches
 
@@ -397,11 +415,12 @@ def create_hourly_stats(
     """
     Verifies column ids in `amount` and creates hourly stats at a given hour `hour_timestamp`
     for particular participant and data source. Note that the `hour_timestamp` is rounded down
-    to the nearest hour.
-    :param participant: participant of a campaign
-    :param data_source: data source of the data record
-    :param hour_timestamp: timestamp of the hour
-    :param amounts: dict of amounts in following format: {column_id: {value: count}}
+    to the nearest hour. If the hourly stats already exists, it is *updated*.
+    :param `participant`: participant (`models.Participant`) of the data record
+    :param `data_source`: data source (`models.DataSource`) of the data record
+    :param `hour_timestamp`: timestamp (datetime) of the data record (rounded down to nearest
+                                hour)
+    :param `amounts`: dict of amounts in following format: {column_id: {value: count}}
                     where `column_id` is the integer id of the column, `value` is particular
                     value of the column, and `count` is the number of records with that value.
     """
@@ -421,6 +440,18 @@ def create_hourly_stats(
     for column_id in amount.keys():
         if column_id not in column_ids:
             raise ValueError(f'Invalid column id: {column_id}')
+
+    # if hourly stats already exists, update it
+    hourly_stats = mdl.HourlyStats.filter(
+        participant = participant,
+        data_source = data_source,
+        timestamp = hour_timestamp,
+    )
+    if hourly_stats:
+        hourly_stats = hourly_stats[0]
+        hourly_stats.amount = amount
+        hourly_stats.save()
+        return
 
     # create hourly stats (i.e. insert into database)
     # pylint: disable=no-value-for-parameter
@@ -445,10 +476,13 @@ def create_data_record(
 ):
     """
     Creates a data record in raw data table (e.g. sensor reading)
-    :param participant: participant of a campaign
-    :param data_source: data source of the data record
-    :param timestamp: timestamp of the data record
-    :param value: value of the data record (dict of column id and value)
+    :param `participant`: participant (`models.Participant`) of the data record
+    :param `data_source`: data source (`models.DataSource`) of the data record
+    :param `timestamp`: timestamp (datetime) of the data record
+    :param `value`: dict of values in following format: {column_id: value}
+                    where `column_id` is a string of the column id, and `value` is the value
+                    of the column. Note that the `column_id` is a string because it is
+                    converted to JSON when stored in the database.
     """
 
     # NOTE: verification is already done in wrappers.DataTable.insert() function
@@ -465,12 +499,15 @@ def create_data_records(
     values: List[Dict[str, Union[datetime, str, int, float]]],
 ):
     """
-    Creates a list of data records in raw data table (e.g. sensor reading)
-    :param participant: participant of a campaign
-    :param data_source_ids: list of data source ids
-    :param tss: list of timestamps
-    :param vals: list of values
-    :return: None
+    Creates multiple data records in raw data table (e.g. sensor reading)
+    :param `participant`: participant (`models.Participant`) of the data record
+    :param `data_source_ids`: list of data source ids (integers) of the data record.
+                                 data source ids must be valid (i.e. exist in database)
+    :param `timestamps`: list of timestamps (datetimes) of the data record
+    :param `values`: list of dicts of values in following format: {column_id: value}.
+                        where `column_id` is a string of the column id, and `value` is the value
+                        of the column. Note that the `column_id` is a string because it is
+                        converted to JSON when stored in the database.
     """
 
     # NOTE: verification is already done in wrappers.DataTable.insert() function

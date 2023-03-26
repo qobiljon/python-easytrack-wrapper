@@ -1019,3 +1019,43 @@ class HourlyStatsTestcase(BaseTestCase):
         )
         for column in columns:
             self.assertTrue(all(x == time1_amount for x in tmp[column].values()))
+
+    def test_latest_hourly_stats(self):
+        ''' Test that the latest hourly stats table is correctly updated. '''
+
+        # create campaign, data source, and participant
+        campaign = self.new_campaign(user = self.new_user('creator'))
+        data_source = self.new_data_source('dummy')
+        svc.add_campaign_data_source(campaign = campaign, data_source = data_source)
+        user = self.new_user('participant')
+        svc.add_campaign_participant(campaign = campaign, add_user = user)
+        participant = slc.get_participant(campaign = campaign, user = user)
+        columns = slc.get_data_source_columns(data_source = data_source)
+        columns = [x for x in columns if x.name != ColumnTypes.TIMESTAMP.name]
+
+        # prepare two timestamps and corresponding amounts
+        tmp = [
+            (datetime.now() - timedelta(hours = 1), 1),
+            (datetime.now(), 2),
+        ]
+        # create the two `models.HourlyStats` instances
+        for timestamp, dummy_count in tmp:
+            amount: Dict[int, Dict[str, int]] = {}
+            for column in columns:
+                amount[column.id] = {'value': dummy_count}
+
+            # `timestamp` should automatically be rounded to the nearest hour
+            svc.create_hourly_stats(
+                participant = participant,
+                data_source = data_source,
+                hour_timestamp = timestamp,
+                amount = amount,
+            )
+
+        # verify amount of data with get_latest_hourly_stats
+        tmp = slc.get_latest_hourly_amount(
+            participant = participant,
+            data_source = data_source,
+        )
+        for column in columns:
+            self.assertTrue(all(x == 2 for x in tmp[column].values()))

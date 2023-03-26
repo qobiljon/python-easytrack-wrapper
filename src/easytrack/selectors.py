@@ -13,12 +13,15 @@ from .settings import ColumnTypes
 # region user
 
 
-def find_user(user_id: int = None, email: int = None) -> Optional[models.User]:
+def find_user(
+    user_id: int = None,
+    email: int = None,
+) -> Optional[models.User]:
     """
-    Used for finding models.User object by either id or email.
-    :param user_id: id of user being queried
-    :param email: email of user being queried
-    :return: models.User object
+    Used for finding `models.User` object by either id or email.
+    :param `user_id`: id (int) of user being queried
+    :param `email`: email (str) of user being queried
+    :return: a `models.User` object
     """
 
     if user_id is not None:
@@ -44,9 +47,9 @@ def get_all_campaigns() -> List[models.Campaign]:
 
 def get_campaign(campaign_id: int) -> Optional[models.Campaign]:
     """
-    Used for finding models.Campaign object by id.
-    :param campaign_id: id of campaign being queried
-    :return: models.Campaign object
+    Used for finding `models.Campaign` object by id.
+    :param `campaign_id`: id (int) of campaign being queried
+    :return: a `models.Campaign` object
     """
 
     return models.Campaign.get_or_none(id = notnull(campaign_id))
@@ -54,8 +57,8 @@ def get_campaign(campaign_id: int) -> Optional[models.Campaign]:
 
 def get_supervisor_campaigns(user: models.User) -> List[models.Campaign]:
     """
-    Filter campaigns by supervisor (when researcher wants to see the list of their campaigns)
-    :param user: the supervisor
+    Returns list of campaigns supervised by a user (supervisor)
+    :param `user`: user that is a supervisor
     :return: list of supervisor's campaigns
     """
 
@@ -71,9 +74,9 @@ def get_supervisor_campaigns(user: models.User) -> List[models.Campaign]:
 def is_participant(campaign: models.Campaign, user: models.User) -> bool:
     """
     Checks whether a user is a campaign's participant or not
-    :param user: user being checked
-    :param campaign: campaign being checked
-    :return: true if user is campaign's participant, false if not
+    :param `user`: user being checked
+    :param `campaign`: campaign being checked
+    :return: `true` if user is campaign's participant, `false` if not
     """
 
     return models.Participant.filter(campaign = notnull(campaign), user = notnull(user)).exists()
@@ -82,9 +85,9 @@ def is_participant(campaign: models.Campaign, user: models.User) -> bool:
 def get_participant(campaign: models.Campaign, user: models.User) -> models.Participant:
     """
     Returns a participant object depending on the user and campaign provided
-    :param user: user key to search for a participant object
-    :param campaign: campaign key to search for a participant object
-    :return: participant object
+    :param `user`: user key to search for a participant object
+    :param `campaign`: campaign key to search for a participant object
+    :return: a `models.Participant` object
     """
 
     return models.Participant.get_or_none(campaign = notnull(campaign), user = notnull(user))
@@ -93,7 +96,7 @@ def get_participant(campaign: models.Campaign, user: models.User) -> models.Part
 def get_campaign_participants(campaign: models.Campaign) -> List[models.Participant]:
     """
     Returns list of participants of a campaign
-    :param campaign: campaign being queried
+    :param `campaign`: campaign being queried
     :return: list of campaign's participants
     """
 
@@ -102,8 +105,8 @@ def get_campaign_participants(campaign: models.Campaign) -> List[models.Particip
 
 def get_campaign_participants_count(campaign: models.Campaign) -> int:
     """
-    Returns count of participants of a campaign
-    :param campaign: campaign being queried
+    Returns number of participants of a campaign
+    :param `campaign`: campaign being queried
     :return: number of campaign's participants
     """
 
@@ -118,9 +121,9 @@ def get_campaign_participants_count(campaign: models.Campaign) -> int:
 def is_supervisor(campaign: models.Campaign, user: models.User) -> bool:
     """
     Checks whether a user is a campaign's supervisor or not
-    :param user: user being checked
-    :param campaign: campaign being checked
-    :return: true if user is campaign's supervisor, false if not
+    :param `user`: user being checked
+    :param `campaign`: campaign being checked
+    :return: `true` if user is campaign's supervisor, `false` if not
     """
 
     return models.Supervisor.filter(campaign = campaign, user = user).exists()
@@ -129,9 +132,9 @@ def is_supervisor(campaign: models.Campaign, user: models.User) -> bool:
 def get_supervisor(campaign: models.Campaign, user: models.User) -> models.Supervisor:
     """
     Returns a supervisor object depending on the user and campaign provided
-    :param user: user key to search for a supervisor object
-    :param campaign: campaign key to search for a supervisor object
-    :return: supervisor object
+    :param `user`: user key to search for a supervisor object
+    :param `campaign`: campaign key to search for a supervisor object
+    :return: a `models.Supervisor` object
     """
 
     return models.Supervisor.get_or_none(campaign = notnull(campaign), user = notnull(user))
@@ -139,8 +142,8 @@ def get_supervisor(campaign: models.Campaign, user: models.User) -> models.Super
 
 def get_campaign_supervisors(campaign: models.Campaign) -> List[models.Supervisor]:
     """
-    Returns list of a campaign's supervisors
-    :param campaign: campaign being queried
+    Returns list of supervisors of a campaign
+    :param `campaign`: campaign being queried
     :return: list of campaign's supervisors
     """
 
@@ -152,11 +155,14 @@ def get_campaign_supervisors(campaign: models.Campaign) -> List[models.Superviso
 # region data source
 
 
-def find_data_source(data_source_id: int = None, name: str = None) -> Optional[models.DataSource]:
+def find_data_source(
+    data_source_id: int = None,
+    name: str = None,
+) -> Optional[models.DataSource]:
     """
-    Used for finding DataSource object by either id or name.
-    :param data_source_id: id of data source being queried
-    :param name: name of data source being queried
+    Used for finding models.DataSource object by either id or name.
+    :param `data_source_id`: id (int) of data source being queried
+    :param `name`: name (str) of data source being queried
     :return: DataSource object (if found)
     """
 
@@ -179,7 +185,7 @@ def get_all_data_sources() -> List[models.DataSource]:
 def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSource]:
     """
     Returns list of a campaign's data sources
-    :param campaign: campaign being queried
+    :param `campaign`: campaign being queried
     :return: list of campaign's data sources
     """
 
@@ -192,9 +198,9 @@ def get_campaign_data_sources(campaign: models.Campaign) -> List[models.DataSour
 
 def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataSource):
     """
-    Checks if data source is being used by a campaign
-    :param campaign: the campaign being queried
-    :param data_source: data source being queried
+    Checks whether a data source is used by a campaign
+    :param `campaign`: the campaign being queried
+    :param `data_source`: data source being queried
     :return: whether data source is used by campaign
     """
 
@@ -209,7 +215,7 @@ def is_campaign_data_source(campaign: models.Campaign, data_source: models.DataS
 def get_data_source_columns(data_source: models.DataSource) -> List[models.Column]:
     """
     Returns list of a data source's columns
-    :param data_source: data source being queried
+    :param `data_source`: data source being queried
     :return: list of data source's columns
     """
 
@@ -227,15 +233,15 @@ def get_hourly_amount_of_data(
     participant: models.Participant,
     data_source: models.DataSource,
     hour_timestamp: datetime,
-) -> Dict[models.Column, int]:
+) -> Dict[models.Column, Dict[str, int]]:
     """
     Returns dictionary with the amount of data for each column of a data source
     at a given hour `hour_timestamp` for particular participant and data source.
     Note that `hour_timestamp` is rounded down to the nearest hour.
-    :param participant: participant being queried
-    :param data_source: data source being queried
-    :param hour_timestamp: timestamp of the hour being queried
-    :return: dictionary with the amount of data for each column
+    :param `participant`: participant being queried
+    :param `data_source`: data source being queried
+    :param `hour_timestamp`: timestamp of the hour being queried
+    :return: dictionary with the amount of data for each column of a data source
     """
 
     # preprocess timestamp (i.e. round down to nearest hour)
@@ -319,6 +325,62 @@ def get_hourly_amount_of_data(
 
     # return the amount of data for each column
     return ans
+
+
+def get_latest_hourly_amount(
+    participant: models.Participant,
+    data_source: models.DataSource,
+) -> Dict[models.Column, Dict[str, int]]:
+    """
+    Returns dictionary with the amount of data for each column of a data source
+    at the latest hour for particular participant and data source.
+    :param `participant`: participant being queried
+    :param `data_source`: data source being queried
+    :return: dictionary with the amount of data for each column of a data source,
+             may be empty if no `models.HourlyStats` exist yet
+    """
+
+    # get the latest hourly stats
+    stats = models.HourlyStats.filter(
+        participant = participant,
+        data_source = data_source,
+    ).order_by(models.HourlyStats.timestamp.desc()).limit(1).execute()
+    stats = next(iter(stats), None)
+
+    # if hourly stats exist, return the amount of data for each column
+    if stats:
+        # no-op: for linting purposes only
+        stats: models.HourlyStats = stats
+
+        # json stores column ids as strings (not integers)
+        # so we need to convert them back for lookup by column id (int)
+        amounts = {int(k): v for k, v in dict(stats.amount).items()}
+
+        # get data source columns
+        data_source_columns = get_data_source_columns(data_source = data_source)
+
+        # prepare the dictionary with the amount of data for each column
+        ans: Dict[models.Column, Dict[str, int]] = {}
+        for data_source_column in data_source_columns:
+
+            # skip timestamp column
+            if data_source_column.name == ColumnTypes.TIMESTAMP.name:
+                continue
+
+            # if column is not in the stats, skip it
+            if data_source_column.id not in amounts:
+                # new value for column was added after the stats were computed
+                # (categorical column)
+                continue
+
+            # if column has constraints, update the dictionary
+            ans[data_source_column] = amounts[data_source_column.id]
+
+        # return the amount of data for each column
+        return ans
+
+    # if no hourly stats exist, return empty dictionary
+    return {}
 
 
 # endregion
