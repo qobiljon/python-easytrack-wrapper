@@ -682,12 +682,13 @@ class DataSourceTestCase(BaseTestCase):
     def test_columns_order(self):
         """Test that columns are ordered correctly."""
 
-        # create a data source
+        # create a data source with column names : `float`, `timestamp`, `integer`
+        # timestamp is expected to be re-ordered to the first column -> `timestamp`, `float`, `integer`
         data_source = svc.create_data_source(
             name = 'dummy',
             columns = [
                 mdl.Column.create(
-                    name = 'value',
+                    name = 'float',
                     column_type = ColumnTypes.FLOAT.name,
                     is_categorical = False,
                     accept_values = None,
@@ -698,14 +699,33 @@ class DataSourceTestCase(BaseTestCase):
                     is_categorical = False,
                     accept_values = None,
                 ),
+                mdl.Column.create(
+                    name = 'integer',
+                    column_type = ColumnTypes.INTEGER.name,
+                    is_categorical = False,
+                    accept_values = None,
+                ),
             ],
         )
 
-        # check that timestamp column is created
+        # check that `mdl.DataSourceColumn` is ordered correctly
+        tmp = mdl.DataSourceColumn.select().where(
+            mdl.DataSourceColumn.data_source == data_source).order_by(
+                mdl.DataSourceColumn.column_order.asc())
+        self.assertEqual(tmp[0].column.name, 'timestamp')   # re-ordered to be first
+        self.assertEqual(tmp[1].column.name, 'float')
+        self.assertEqual(tmp[2].column.name, 'integer')
+
+        # `slc.get_data_source_columns` should return the same order
         data_source_columns = slc.get_data_source_columns(data_source = data_source)
-        self.assertEqual(len(data_source_columns), 2)
+        self.assertEqual(len(data_source_columns), 3)
         self.assertEqual(data_source_columns[0].name, 'timestamp')
-        self.assertEqual(data_source_columns[1].name, 'value')
+
+        # check that order of `mdl.DataSourceColumn` and `slc.get_data_source_columns` is the same
+        self.assertEqual(
+            set(data_source_columns),
+            set([elem.column for elem in tmp]),
+        )
 
 
 class DataTableTestCase(BaseTestCase):

@@ -292,14 +292,14 @@ def create_data_source(
     )
 
     # add columns (except reserved `timestamp` column)
-    for i, column in enumerate(columns):
+    for i, column in enumerate(columns, start = 1):
         if column.name == ColumnTypes.TIMESTAMP.name:
             continue   # skip reserved `timestamp` column (already added)
 
         mdl.DataSourceColumn.create(
             data_source = data_source,
             column = column,
-            column_order = i + 1,   # +1 to account for reserved `timestamp` column
+            column_order = i,   # +1 to account for reserved `timestamp` column
         )
 
     return data_source
