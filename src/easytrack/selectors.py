@@ -1,4 +1,6 @@
-''' Read operations / queries to easytrack's `core` and `data` tables. '''
+"""
+Read operations / queries to easytrack's `core` and `data` tables.
+"""
 
 # stdlib
 from typing import List, Dict, Optional, Tuple
@@ -216,11 +218,15 @@ def get_data_source_columns(data_source: models.DataSource) -> List[models.Colum
     """
     Returns list of a data source's columns
     :param `data_source`: data source being queried
-    :return: list of data source's columns
+    :return: list of data source's columns. The order of columns is determined by
+            the order of columns in the data source's columns list (see `models.DataSourceColumn`).
     """
 
-    # get data source columns from mdl.DataSourceColumns
+    # get list of data source columns with order information
     tmp = models.DataSourceColumn.filter(data_source = notnull(data_source))
+
+    # return list of columns ordered by column order
+    tmp = tmp.order_by(models.DataSourceColumn.column_order.asc())
     return [data_source_column.column for data_source_column in tmp]
 
 

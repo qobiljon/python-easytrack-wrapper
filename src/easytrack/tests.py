@@ -1,4 +1,7 @@
-"""Unit tests for easytrack package."""
+"""
+Unit tests for easytrack package.
+"""
+
 # pylint: disable=no-value-for-parameter
 # pylint: disable=too-many-lines
 
@@ -79,10 +82,13 @@ class BaseTestCase(TestCase):
         for query in [
                 mdl.CampaignDataSource.delete(),
                 mdl.Participant.delete(),
-                mdl.Participant.delete(),
+                mdl.Supervisor.delete(),
                 mdl.Campaign.delete(),
                 mdl.DataSource.delete(),
+                mdl.DataSourceColumn.delete(),
+                mdl.Column.delete(),
                 mdl.User.delete(),
+                mdl.HourlyStats.delete(),
         ]:
             query.execute()
 
@@ -402,6 +408,29 @@ class ColumnTestCase(BaseTestCase):
                 accept_values = None,
             )
 
+    def test_existing_column(self):
+        """ Test that identical column cannot be created. """
+
+        tests = [
+            ('dummy1', ColumnTypes.TEXT.name, True, 'a,b,c'),
+            ('dummy2', ColumnTypes.INTEGER.name, False, '1,2,3'),
+            ('dummy3', ColumnTypes.FLOAT.name, False, None),
+        ]
+        for name, column_type, is_categorical, accept_values in tests:
+            instance_1 = svc.create_column(
+                name = name,
+                column_type = column_type,
+                is_categorical = is_categorical,
+                accept_values = accept_values,
+            )
+            instance_2 = svc.create_column(
+                name = name,
+                column_type = column_type,
+                is_categorical = is_categorical,
+                accept_values = accept_values,
+            )
+            self.assertEqual(instance_1, instance_2)
+
     def test_valid(self):
         '''Test that a column can be created with valid parameters.''' ''
 
@@ -649,6 +678,34 @@ class DataSourceTestCase(BaseTestCase):
         data_source_columns = slc.get_data_source_columns(data_source = data_source)
         self.assertEqual(len(data_source_columns), 2)
         self.assertIn('timestamp', [column.name for column in data_source_columns])
+
+    def test_columns_order(self):
+        """Test that columns are ordered correctly."""
+
+        # create a data source
+        data_source = svc.create_data_source(
+            name = 'dummy',
+            columns = [
+                mdl.Column.create(
+                    name = 'value',
+                    column_type = ColumnTypes.FLOAT.name,
+                    is_categorical = False,
+                    accept_values = None,
+                ),
+                mdl.Column.create(
+                    name = 'timestamp',
+                    column_type = ColumnTypes.TIMESTAMP.name,
+                    is_categorical = False,
+                    accept_values = None,
+                ),
+            ],
+        )
+
+        # check that timestamp column is created
+        data_source_columns = slc.get_data_source_columns(data_source = data_source)
+        self.assertEqual(len(data_source_columns), 2)
+        self.assertEqual(data_source_columns[0].name, 'timestamp')
+        self.assertEqual(data_source_columns[1].name, 'value')
 
 
 class DataTableTestCase(BaseTestCase):

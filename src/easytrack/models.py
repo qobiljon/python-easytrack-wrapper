@@ -1,9 +1,13 @@
-'''Models for the easytrack application.'''
+"""
+Models for the easytrack application.
+"""
+
 # pylint: disable=too-few-public-methods
 
 from datetime import datetime
 from datetime import timedelta
-from peewee import AutoField, TextField, ForeignKeyField, TimestampField, BooleanField
+from peewee import AutoField, TextField, ForeignKeyField, TimestampField
+from peewee import BooleanField, IntegerField
 from peewee import Model, PostgresqlDatabase
 from playhouse.postgres_ext import BinaryJSONField
 
@@ -114,12 +118,16 @@ class DataSourceColumn(Model):
     '''Data source model.'''
     data_source = ForeignKeyField(DataSource, on_delete = 'CASCADE', null = False)
     column = ForeignKeyField(Column, on_delete = 'CASCADE', null = False)
+    column_order = IntegerField(null = False)
 
     class Meta:
         '''Meta class for the DataSourceColumn model.'''
         database = pg_database
         db_table = 'data_source_column'
         schema = 'core'
+        indexes = (
+            (('data_source', 'column', 'column_order'), True),   # unique together
+        )
 
 
 class CampaignDataSource(Model):

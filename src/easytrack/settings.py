@@ -1,4 +1,6 @@
-'''Settings / parameters for the easytrack project.'''
+"""
+Settings / parameters for the easytrack project.
+"""
 
 # stdlib
 from typing import Dict, Type

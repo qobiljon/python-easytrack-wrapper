@@ -1,4 +1,7 @@
-'''Wrappers for data tables and data records'''
+"""
+Wrappers for data tables and data records.
+"""
+
 # pylint: disable=too-few-public-methods
 
 # stdlib

@@ -1,4 +1,6 @@
-''' Write operations / queries to easytrack's `core` and `data` tables. '''
+"""
+Write operations / queries to easytrack's `core` and `data` tables.
+"""
 
 # stdlib
 from datetime import datetime
@@ -249,13 +251,15 @@ def remove_supervisor_from_campaign(old_supervisor: mdl.Supervisor):
 
 def create_data_source(
     name: str,
-    columns: List[mdl.DataSourceColumn],
+    columns: List[mdl.Column],
 ) -> mdl.DataSource:
     """
     Creates a data source in database. If a data source with the same name already exists,
     it returns the existing data source.
     :param `name`: name (string) of the data source (e.g. 'location', 'accelerometer')
-    :param `columns`: list of columns (`models.DataSourceColumn`) of the data source
+    :param `columns`: list of columns (`models.DataSourceColumn`) of the data source. *Note*
+                        that the order of the columns in the list is the order in which
+                        they will be stored in the database.
     :return: data source (`models.DataSource`) created in database
     """
 
@@ -281,13 +285,22 @@ def create_data_source(
         column_type = 'timestamp',
         is_categorical = False,
     )
-    mdl.DataSourceColumn.create(data_source = data_source, column = timestamp_column)
+    mdl.DataSourceColumn.create(
+        data_source = data_source,
+        column = timestamp_column,
+        column_order = 0,
+    )
 
     # add columns (except reserved `timestamp` column)
-    for column in columns:
+    for i, column in enumerate(columns):
         if column.name == ColumnTypes.TIMESTAMP.name:
             continue   # skip reserved `timestamp` column (already added)
-        mdl.DataSourceColumn.create(data_source = data_source, column = column)
+
+        mdl.DataSourceColumn.create(
+            data_source = data_source,
+            column = column,
+            column_order = i + 1,   # +1 to account for reserved `timestamp` column
+        )
 
     return data_source
 
@@ -408,6 +421,16 @@ def create_column(
                 except ValueError as exc:
                     raise ValueError(f'Invalid float value: {value}') from exc
         accept_values_str = ','.join(tmp)
+
+    # if column already exists, return it
+    existing_column = mdl.Column.filter(
+        name = name,
+        column_type = column_type,
+        is_categorical = is_categorical,
+        accept_values = accept_values_str,
+    ).first()
+    if existing_column is not None:
+        return existing_column
 
     # create column
     return mdl.Column.create(

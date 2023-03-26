@@ -1,4 +1,6 @@
-'''Utility functions for the EasyTrack backend.'''
+"""
+Utility functions for the EasyTrack backend.
+"""
 
 from datetime import datetime
 from os.path import join, exists
