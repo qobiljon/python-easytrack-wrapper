@@ -683,7 +683,8 @@ class DataSourceTestCase(BaseTestCase):
         """Test that columns are ordered correctly."""
 
         # create a data source with column names : `float`, `timestamp`, `integer`
-        # timestamp is expected to be re-ordered to the first column -> `timestamp`, `float`, `integer`
+        # timestamp is expected to be re-ordered to the first column
+        # expected order -> `timestamp`, `float`, `integer`
         data_source = svc.create_data_source(
             name = 'dummy',
             columns = [
@@ -709,23 +710,21 @@ class DataSourceTestCase(BaseTestCase):
         )
 
         # check that `mdl.DataSourceColumn` is ordered correctly
-        tmp = mdl.DataSourceColumn.select().where(
-            mdl.DataSourceColumn.data_source == data_source).order_by(
-                mdl.DataSourceColumn.column_order.asc())
-        self.assertEqual(tmp[0].column.name, 'timestamp')   # re-ordered to be first
-        self.assertEqual(tmp[1].column.name, 'float')
-        self.assertEqual(tmp[2].column.name, 'integer')
+        tmp0 = mdl.DataSourceColumn.select() \
+            .where(mdl.DataSourceColumn.data_source == data_source) \
+                .order_by(mdl.DataSourceColumn.column_order.asc())
+        tmp0 = [elem.column for elem in tmp0]
+        self.assertEqual(tmp0[0].name, 'timestamp')   # re-ordered to be first
+        self.assertEqual(tmp0[1].name, 'float')
+        self.assertEqual(tmp0[2].name, 'integer')
 
         # `slc.get_data_source_columns` should return the same order
-        data_source_columns = slc.get_data_source_columns(data_source = data_source)
-        self.assertEqual(len(data_source_columns), 3)
-        self.assertEqual(data_source_columns[0].name, 'timestamp')
+        tmp1 = slc.get_data_source_columns(data_source = data_source)
+        self.assertEqual(len(tmp1), 3)
+        self.assertEqual(tmp1[0].name, 'timestamp')
 
         # check that order of `mdl.DataSourceColumn` and `slc.get_data_source_columns` is the same
-        self.assertEqual(
-            set(data_source_columns),
-            set([elem.column for elem in tmp]),
-        )
+        self.assertEqual(set(tmp0), set(tmp1))
 
 
 class DataTableTestCase(BaseTestCase):
